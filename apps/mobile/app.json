@@ -6,6 +6,9 @@
     "version": "0.0.1",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true
+    "newArchEnabled": false,
+    "ios": {
+      "bundleIdentifier": "com.anonymous.lazynavy-v3"
+    }
   }
 }

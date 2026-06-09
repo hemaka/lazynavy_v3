@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "expo start --port 9190",
     "build": "expo export",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@lazynavy-v3/config": "workspace:*",
@@ -14,6 +16,7 @@
     "expo": "~53.0.0",
     "expo-constants": "~17.1.8",
     "expo-linear-gradient": "~14.1.5",
+    "expo-linking": "~7.1.7",
     "expo-router": "~5.1.11",
     "expo-sqlite": "~15.2.14",
     "expo-status-bar": "~2.2.0",

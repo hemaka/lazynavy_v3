@@ -4,39 +4,41 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Dimensions,
+  Image,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { CaptainHudResponse } from '@lazynavy-v3/types'
-import { SyncStatusBar } from '../../features/offline/SyncStatusBar'
 import { bottomNav } from '../../navigation/navConfig'
 import { IconGlyph } from '../../shared/ui/IconGlyph'
 import { colors } from '../../theme/tokens'
 import { createVessel, getCaptainHud } from './api'
 import { fallbackHud } from './fallbackHud'
 
-const { width } = Dimensions.get('window')
+const { width, height } = Dimensions.get('window')
+const hudBackgroundWidth = height * (2428 / 2250)
+const hudBackground = require('../../assets/hud_bg_1.png')
 
 export function HomeCaptainHudScreen() {
-  const [hud, setHud] = useState<CaptainHudResponse | null>(null)
-  const [loading, setLoading] = useState(true)
+  const insets = useSafeAreaInsets()
+  const [hud, setHud] = useState<CaptainHudResponse | null>(fallbackHud)
+  const [loading, setLoading] = useState(false)
   const [emptyPreview, setEmptyPreview] = useState(false)
+  const [crewSheetOpen, setCrewSheetOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
+    setHud(emptyPreview ? { ...fallbackHud, user: null, currentVessel: null, activeVoyage: null, shortcuts: [], sceneTemplate: 'empty_sea' } : fallbackHud)
+    setLoading(false)
     getCaptainHud(emptyPreview)
       .then((next) => {
         if (!cancelled) setHud(next)
       })
       .catch(() => {
         if (!cancelled) setHud(emptyPreview ? { ...fallbackHud, user: null, currentVessel: null, activeVoyage: null, shortcuts: [], sceneTemplate: 'empty_sea' } : fallbackHud)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
       })
     return () => {
       cancelled = true
@@ -59,7 +61,7 @@ export function HomeCaptainHudScreen() {
     }
   }
 
-  if (!hud || loading) {
+  if (!hud) {
     return (
       <LinearGradient colors={[colors.skyTop, colors.skyBottom]} style={styles.loading}>
         <ActivityIndicator color={colors.accent} />
@@ -68,13 +70,19 @@ export function HomeCaptainHudScreen() {
   }
 
   const hasBoat = !!hud.currentVessel
+  const topArea = Math.max(insets.top, 16) + 10
+  const bottomArea = Math.max(insets.bottom, 10) + 10
+  const weatherTop = topArea + 76
+  const sideButtonTop = topArea + 176
+  const alertBottom = bottomArea + 74
+  const navBottom = bottomArea
 
   return (
     <View style={styles.screen}>
       <Scene hasBoat={hasBoat} template={hud.sceneTemplate} />
-      <SafeAreaView style={styles.safe}>
+      <View style={styles.safe}>
         {hud.user && (
-          <View style={styles.playerHud}>
+          <View style={[styles.playerHud, { marginTop: topArea }]}>
             <View style={styles.avatarWrap}>
               <View style={styles.avatar}><Text style={styles.avatarText}>{hud.user.nickname.slice(0, 1)}</Text></View>
             </View>
@@ -88,75 +96,59 @@ export function HomeCaptainHudScreen() {
           </View>
         )}
         {hud.user && (
-          <Pressable style={styles.messageButton} onPress={() => router.push('/boat/crew')}>
+          <Pressable style={[styles.messageButton, { top: topArea + 20 }]} onPress={() => router.push('/boat/crew')}>
             <Text style={styles.messageIcon}>▱</Text>
             <View style={styles.messageDot} />
           </Pressable>
         )}
 
+        {hasBoat && (
+          <View style={[styles.conditionRow, { top: weatherTop }]}>
+            {hud.weather.slice(0, 3).map((chip) => (
+              <View key={chip.key} style={styles.conditionChip}>
+                <Text style={styles.conditionGlyph}>{weatherGlyph(chip.key)}</Text>
+                <Text style={styles.conditionValue}>{chip.value}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         {hasBoat ? (
           <>
             <View style={styles.boatNameWrap}>
-              <Pressable style={styles.boatName} onPress={() => router.push('/boat/overview')}>
-                <Text style={styles.boatNameText}>{hud.currentVessel?.name}⌄</Text>
+              <Pressable style={styles.vesselInfoCard} onPress={() => router.push('/boat/overview')}>
+                <View style={styles.vesselPhoto}>
+                  <Text style={styles.vesselPhotoIcon}>◢</Text>
+                </View>
+                <View style={styles.vesselInfoMain}>
+                  <Text numberOfLines={1} style={styles.vesselNickname}>{hud.currentVessel?.name}</Text>
+                  <Text numberOfLines={1} style={styles.vesselRegisteredName}>{vesselRegisteredName(hud)}</Text>
+                </View>
+                <Pressable style={styles.vesselCaptainAvatar} onPress={() => setCrewSheetOpen(true)}>
+                  <Text style={styles.vesselCaptainText}>{(hud.user?.nickname ?? 'C').slice(0, 1)}</Text>
+                </Pressable>
               </Pressable>
             </View>
 
-            <View style={styles.conditionRow}>
-              {hud.weather.slice(0, 3).map((chip) => (
-                <View key={chip.key} style={styles.conditionChip}>
-                  <Text style={styles.conditionGlyph}>{weatherGlyph(chip.key)}</Text>
-                  <Text style={styles.conditionValue}>{chip.value}</Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={styles.crewStrip}>
-              <View style={styles.crewProfile}>
-                <View style={styles.crewAvatar}><Text style={styles.crewAvatarText}>⚓</Text></View>
-                <View>
-                  <Text style={styles.crewValue}>Captain {hud.user?.nickname ?? 'You'}</Text>
-                  <Text style={styles.crewLabel}>Captain</Text>
-                </View>
-              </View>
-              <View style={styles.crewDivider} />
-              <View style={styles.crewProfile}>
-                <View style={styles.crewAvatarAlt}><Text style={styles.crewAvatarText}>◌</Text></View>
-                <View>
-                  <Text style={styles.crewValue}>You: <Text style={styles.crewRole}>{hud.currentVessel?.userRole}</Text></Text>
-                  <Text style={styles.crewLabel}>♨</Text>
-                </View>
-              </View>
-              <View style={styles.crewDivider} />
-              <Pressable style={styles.crewAction} onPress={() => router.push('/boat/crew')}>
-                <Text style={styles.crewActionIcon}>♙</Text>
-                <Text style={styles.crewActionText}>{hud.currentVessel?.crewCount} crew</Text>
-              </Pressable>
-              <View style={styles.crewDivider} />
-              <Pressable style={styles.crewAction} onPress={() => router.push('/boat/crew')}>
-                <Text style={styles.crewActionIcon}>＋</Text>
-                <Text style={styles.crewActionText}>Invite</Text>
-              </Pressable>
-            </View>
-
-            {hud.activeVoyage?.needsConfirmation && (
-              <Pressable style={styles.alert} onPress={() => router.push('/voyage')}>
-                <View style={styles.alertIconWrap}><Text style={styles.alertIcon}>✧</Text></View>
-                <View style={styles.alertMain}>
-                  <Text style={styles.alertTitle}>Voyage plan needs review</Text>
-                  <Text style={styles.alertText}>● 2 changes logged</Text>
-                </View>
-                <View style={styles.reviewButton}><Text style={styles.reviewText}>Review 〉</Text></View>
-              </Pressable>
+            {crewSheetOpen && (
+              <CrewSheet hud={hud} bottomOffset={bottomArea} onClose={() => setCrewSheetOpen(false)} />
             )}
 
-            <View style={styles.shortcutsLeft}>
+            <Pressable style={[styles.alert, { bottom: alertBottom }]} onPress={() => router.push('/voyage')}>
+              <View style={styles.alertIconWrap}><Text style={styles.alertIcon}>✧</Text></View>
+              <View style={styles.alertMain}>
+                <Text style={styles.alertTitle}>Voyage plan needs review</Text>
+                <Text style={styles.alertText}>● 2 changes logged</Text>
+              </View>
+              <View style={styles.reviewButton}><Text style={styles.reviewText}>Review 〉</Text></View>
+            </Pressable>
+
+            <View style={[styles.shortcutsLeft, { top: sideButtonTop }]}>
               {hud.shortcuts.filter((item) => item.pinned).slice(0, 2).map((item) => <Shortcut key={item.key} item={item} />)}
             </View>
-            <View style={styles.shortcutsRight}>
+            <View style={[styles.shortcutsRight, { top: sideButtonTop }]}>
               {hud.shortcuts.filter((item) => item.pinned).slice(2, 4).map((item) => <Shortcut key={item.key} item={item} />)}
             </View>
-            <View style={styles.syncWrap}><SyncStatusBar /></View>
           </>
         ) : (
           <View style={styles.emptyActions}>
@@ -168,15 +160,15 @@ export function HomeCaptainHudScreen() {
           </View>
         )}
 
-        <View style={styles.bottomNav}>
+        <View style={[styles.bottomNav, { bottom: navBottom }]}>
           {bottomNav.slice(0, 3).map((item) => (
             <Pressable key={item.key} style={styles.navItem} onPress={() => router.push(item.href as never)}>
-              <IconGlyph name={item.icon} color={colors.accent} size={26} />
+              <IconGlyph name={item.icon} color={colors.accent} size={26}/>
               <Text style={styles.navText}>{item.label}</Text>
             </Pressable>
           ))}
         </View>
-      </SafeAreaView>
+      </View>
     </View>
   )
 }
@@ -189,26 +181,60 @@ function Shortcut({ item }: { item: { href: string; icon: string; label: string 
   )
 }
 
+function CrewSheet({ hud, bottomOffset, onClose }: { hud: CaptainHudResponse; bottomOffset: number; onClose: () => void }) {
+  const isCaptain = hud.currentVessel?.userRole === 'captain'
+  const captainName = hud.user?.nickname ?? 'Captain'
+  const otherCrewCount = Math.max((hud.currentVessel?.crewCount ?? 1) - 1, 0)
+
+  return (
+    <View style={styles.crewSheetLayer}>
+      <Pressable style={styles.crewSheetBackdrop} onPress={onClose} />
+      <View style={[styles.crewSheet, { marginBottom: bottomOffset + 86 }]}>
+        <View style={styles.sheetHandle} />
+        <View style={styles.sheetHeader}>
+          <Text style={styles.sheetTitle}>Crew</Text>
+          <Pressable style={styles.sheetClose} onPress={onClose}><Text style={styles.sheetCloseText}>×</Text></Pressable>
+        </View>
+        <View style={styles.memberRow}>
+          <View style={styles.memberAvatar}><Text style={styles.memberAvatarText}>{captainName.slice(0, 1)}</Text></View>
+          <View style={styles.memberMain}>
+            <Text numberOfLines={1} style={styles.memberName}>{captainName}</Text>
+            <Text style={styles.memberRole}>Captain</Text>
+          </View>
+        </View>
+        <View style={styles.memberRow}>
+          <View style={styles.memberAvatarAlt}><Text style={styles.memberAvatarText}>Y</Text></View>
+          <View style={styles.memberMain}>
+            <Text numberOfLines={1} style={styles.memberName}>You</Text>
+            <Text style={styles.memberRole}>{roleLabel(hud.currentVessel?.userRole ?? 'guest')}</Text>
+          </View>
+        </View>
+        {otherCrewCount > 1 && (
+          <View style={styles.memberRowMuted}>
+            <Text style={styles.memberMutedText}>{otherCrewCount - 1} more crew member(s)</Text>
+          </View>
+        )}
+        {isCaptain && (
+          <Pressable
+            style={styles.inviteButton}
+            onPress={() => {
+              onClose()
+              router.push('/boat/crew')
+            }}
+          >
+            <Text style={styles.inviteButtonText}>Invite</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
+  )
+}
+
 function Scene({ hasBoat, template }: { hasBoat: boolean; template: string }) {
   return (
     <View style={StyleSheet.absoluteFill}>
-      <LinearGradient colors={['#0084d8', '#10aee8', '#7de3ff']} style={styles.sky} />
-      <View style={[styles.sun, template === 'maintenance_yard' && styles.sunDim]} />
-      <View style={[styles.cloud, styles.cloudOne]}><View style={styles.cloudPuffA} /><View style={styles.cloudPuffB} /><View style={styles.cloudPuffC} /></View>
-      <View style={[styles.cloud, styles.cloudTwo]}><View style={styles.cloudPuffA} /><View style={styles.cloudPuffB} /><View style={styles.cloudPuffC} /></View>
-      <Text style={styles.gullOne}>⌁</Text>
-      <Text style={styles.gullTwo}>⌁</Text>
-      <View style={styles.coastBack} />
-      <View style={styles.coastFront} />
-      <View style={styles.harborTown}>
-        {Array.from({ length: 9 }).map((_, index) => <View key={index} style={[styles.house, { left: index * 36, top: index % 3 * 13 }]} />)}
-      </View>
-      <LinearGradient colors={['#18c4dc', '#03a7cb', '#087a96']} style={styles.water} />
-      <View style={styles.waterShineA} />
-      <View style={styles.waterShineB} />
-      <View style={styles.waterShineC} />
-      <View style={styles.waveOne} />
-      <View style={styles.waveTwo} />
+      <Image source={hudBackground} style={[styles.hudBackgroundImage, { width: hudBackgroundWidth, left: (width - hudBackgroundWidth) / 2 }]} />
+      <LinearGradient colors={['rgba(0,132,216,0.08)', 'rgba(16,174,232,0.04)', 'rgba(3,86,116,0.18)']} style={StyleSheet.absoluteFill} />
       {hasBoat && (
         <View style={styles.boat}>
           <View style={styles.mast} />
@@ -231,10 +257,19 @@ function weatherGlyph(key: string) {
   return '☼'
 }
 
+function roleLabel(role: string) {
+  return role.split('_').map((part) => part.slice(0, 1).toUpperCase() + part.slice(1)).join(' ')
+}
+
+function vesselRegisteredName(hud: CaptainHudResponse) {
+  return hud.currentVessel?.title || hud.currentVessel?.homePort || 'Registered vessel'
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#0096d8' },
   safe: { flex: 1 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  hudBackgroundImage: { position: 'absolute', top: 0, height, resizeMode: 'stretch' },
   sky: { position: 'absolute', top: 0, left: 0, right: 0, height: '62%' },
   sun: { position: 'absolute', top: 96, right: 44, width: 76, height: 76, borderRadius: 38, backgroundColor: 'rgba(255,246,173,0.72)' },
   sunDim: { opacity: 0.45 },
@@ -264,55 +299,83 @@ const styles = StyleSheet.create({
   sailSmall: { position: 'absolute', left: '24%', bottom: 66, width: 0, height: 0, borderLeftWidth: 48, borderRightWidth: 0, borderBottomWidth: 94, borderLeftColor: 'transparent', borderBottomColor: 'rgba(232,247,255,0.94)' },
   cabin: { position: 'absolute', left: '34%', right: '24%', bottom: 42, height: 22, borderTopLeftRadius: 12, borderTopRightRadius: 12, backgroundColor: 'rgba(255,255,255,0.94)' },
   hull: { position: 'absolute', bottom: 26, left: '18%', right: '11%', height: 30, borderBottomLeftRadius: 34, borderBottomRightRadius: 34, backgroundColor: 'rgba(255,255,255,0.96)', borderBottomWidth: 4, borderBottomColor: '#0f5471' },
-  playerHud: { marginLeft: 52, marginRight: 72, marginTop: 24, minHeight: 66, paddingLeft: 54, paddingRight: 14, paddingVertical: 9, borderRadius: 18, backgroundColor: 'rgba(235,248,255,0.72)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.72)', flexDirection: 'row', alignItems: 'center', shadowColor: '#075985', shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
-  avatarWrap: { position: 'absolute', left: -44, top: -4, width: 74, height: 74 },
-  avatar: { width: 74, height: 74, borderRadius: 37, backgroundColor: '#bfe9ff', borderWidth: 4, borderColor: colors.white, alignItems: 'center', justifyContent: 'center', shadowColor: '#075985', shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
+  playerHud: { marginLeft: 52, marginRight: 70, marginTop: 18, minHeight: 0, paddingLeft: 40, paddingRight: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(255, 255, 255, 0.42)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)', flexDirection: 'row', alignItems: 'center', shadowColor: '#075985', shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
+  avatarWrap: { position: 'absolute', left: -44, top: -7, width: 74, height: 74 },
+  avatar: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#bfe9ff', borderWidth: 1, borderColor: colors.white, alignItems: 'center', justifyContent: 'center', shadowColor: '#075985', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
   avatarText: { color: colors.ink, fontWeight: '900', fontSize: 25 },
   playerMain: { flex: 1 },
-  playerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 22 },
-  playerName: { color: '#071735', fontSize: 15, fontWeight: '900', maxWidth: width * 0.24 },
-  xpText: { color: '#071735', fontSize: 11, fontWeight: '900', marginTop: 2 },
-  xpTrack: { height: 4, borderRadius: 2, backgroundColor: 'rgba(14,116,144,0.22)', overflow: 'hidden', marginTop: 6, maxWidth: width * 0.42 },
+  playerRow: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 18 },
+  playerName: { color: '#071735', fontSize: 16, fontWeight: '600', maxWidth: width * 0.8, paddingBottom: 4 },
+  xpText: { color: '#071735', fontSize: 11, fontWeight: '500', marginTop: 2 },
+  xpTrack: { height: 4, borderRadius: 2, backgroundColor: 'rgba(14,116,144,0.22)', overflow: 'hidden', marginTop: 6, maxWidth: width * 0.8 },
   xpFill: { height: '100%', backgroundColor: '#10b8bd', borderRadius: 2 },
   previewToggle: { width: 54, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,119,182,0.1)' },
   previewText: { color: colors.accent, fontWeight: '900', fontSize: 11 },
-  messageButton: { position: 'absolute', right: 18, top: 38, width: 44, height: 44, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.28)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.76)', alignItems: 'center', justifyContent: 'center' },
+  messageButton: { position: 'absolute', right: 12, top: 38, width: 40, height: 40, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.28)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.76)', alignItems: 'center', justifyContent: 'center' },
   messageIcon: { color: colors.white, fontSize: 30, fontWeight: '900', transform: [{ rotate: '90deg' }] },
-  messageDot: { position: 'absolute', right: -4, top: -4, width: 16, height: 16, borderRadius: 8, backgroundColor: '#ff4b3e', borderWidth: 2, borderColor: colors.white },
-  conditionRow: { position: 'absolute', left: 72, right: 72, bottom: 197, flexDirection: 'row', justifyContent: 'center', gap: 14 },
-  conditionChip: { minWidth: 102, height: 37, paddingHorizontal: 12, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.88)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.92)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  messageDot: { position: 'absolute', right: -6, top: -6, width: 16, height: 16, borderRadius: 8, backgroundColor: '#ff4b3e', borderWidth: 2, borderColor: colors.white },
+  vesselInfoCard: { minWidth: 244, maxWidth: width - 72, minHeight: 58, paddingLeft: 8, paddingRight: 8, paddingVertical: 7, borderRadius: 20, backgroundColor: 'rgba(244,252,255,0.82)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', flexDirection: 'row', alignItems: 'center', gap: 9, shadowColor: '#075985', shadowOpacity: 0.14, shadowRadius: 14, shadowOffset: { width: 0, height: 7 } },
+  vesselPhoto: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(0,139,165,0.16)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.86)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  vesselPhotoIcon: { color: '#008ba5', fontSize: 24, fontWeight: '900' },
+  vesselInfoMain: { flex: 1, minWidth: 0 },
+  vesselNickname: { color: '#071735', fontSize: 14, fontWeight: '900' },
+  vesselRegisteredName: { color: '#0786a6', fontSize: 10, fontWeight: '900', marginTop: 3 },
+  vesselCaptainAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#d9f2ff', borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  vesselCaptainText: { color: '#071735', fontSize: 17, fontWeight: '900' },
+  conditionRow: { position: 'absolute', left: 58, right: 58, top: 94, flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  conditionChip: { minWidth: 82, height: 30, paddingHorizontal: 9, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.78)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.86)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   conditionLabel: { color: colors.muted, fontSize: 10, fontWeight: '800' },
-  conditionGlyph: { color: '#0786a6', fontSize: 22, fontWeight: '900' },
-  conditionValue: { color: '#071735', fontSize: 13, fontWeight: '900' },
-  boatNameWrap: { position: 'absolute', left: 0, right: 0, bottom: 244, alignItems: 'center' },
-  boatName: { alignItems: 'center', paddingHorizontal: 20, paddingVertical: 7, borderRadius: 18, backgroundColor: 'rgba(15,148,170,0.76)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)' },
-  boatNameText: { color: colors.white, fontSize: 18, fontWeight: '900' },
+  conditionGlyph: { color: '#0786a6', fontSize: 17, fontWeight: '900' },
+  conditionValue: { color: '#071735', fontSize: 11, fontWeight: '900' },
+  boatNameWrap: { position: 'absolute', left: 0, right: 0, bottom: 238, alignItems: 'center' },
+  boatName: { alignItems: 'center', paddingHorizontal: 18, paddingVertical: 6, borderRadius: 17, backgroundColor: 'rgba(15,148,170,0.76)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)' },
+  boatNameText: { color: colors.white, fontSize: 16, fontWeight: '900' },
   boatNameSub: { color: colors.muted, fontSize: 10, fontWeight: '700', marginTop: 2 },
-  crewStrip: { position: 'absolute', left: 18, right: 18, bottom: 112, minHeight: 72, paddingHorizontal: 10, borderRadius: 20, backgroundColor: 'rgba(240,250,255,0.92)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.86)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#075985', shadowOpacity: 0.16, shadowRadius: 14, shadowOffset: { width: 0, height: 8 } },
+  crewStrip: { position: 'absolute', left: 18, right: 18, bottom: 154, height: 68, alignItems: 'center', justifyContent: 'center' },
+  captainPill: { height: 58, minWidth: 178, maxWidth: width - 104, paddingLeft: 8, paddingRight: 18, borderRadius: 29, backgroundColor: 'rgba(240,250,255,0.9)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.88)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, shadowColor: '#075985', shadowOpacity: 0.16, shadowRadius: 14, shadowOffset: { width: 0, height: 8 } },
+  captainPillText: { minWidth: 90, maxWidth: width - 192 },
   crewProfile: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
-  crewAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#d9f2ff', borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' },
-  crewAvatarAlt: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#cce7ee', borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' },
-  crewAvatarText: { color: colors.ink, fontSize: 22, fontWeight: '900' },
-  crewLabel: { color: '#0786a6', fontSize: 12, fontWeight: '900', marginTop: 2 },
-  crewValue: { color: '#071735', fontSize: 12, fontWeight: '900' },
+  crewAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#d9f2ff', borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  crewAvatarAlt: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#cce7ee', borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  crewAvatarText: { color: colors.ink, fontSize: 20, fontWeight: '900' },
+  crewLabel: { color: '#0786a6', fontSize: 11, fontWeight: '900', marginTop: 2 },
+  crewValue: { color: '#071735', fontSize: 11, fontWeight: '900' },
   crewRole: { fontWeight: '700' },
   crewDivider: { width: 1, height: 44, backgroundColor: 'rgba(14,116,144,0.18)' },
   crewAction: { width: 48, alignItems: 'center', justifyContent: 'center' },
   crewActionIcon: { color: '#071735', fontSize: 24, fontWeight: '900' },
   crewActionText: { color: '#071735', fontSize: 11, fontWeight: '800', textAlign: 'center' },
-  alert: { position: 'absolute', left: 18, right: 18, bottom: 24 + 76 + 12, minHeight: 62, padding: 10, borderRadius: 18, backgroundColor: 'rgba(244,252,255,0.94)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.86)', flexDirection: 'row', alignItems: 'center', gap: 10, shadowColor: '#075985', shadowOpacity: 0.14, shadowRadius: 12, shadowOffset: { width: 0, height: 7 } },
-  alertIconWrap: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  alertIcon: { color: '#fb6a21', fontSize: 34, fontWeight: '900' },
+  crewSheetLayer: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 20, justifyContent: 'flex-end' },
+  crewSheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,18,38,0.22)' },
+  crewSheet: { marginHorizontal: 18, marginBottom: 104, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16, borderRadius: 18, backgroundColor: 'rgba(244,252,255,0.97)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', shadowColor: '#062d45', shadowOpacity: 0.22, shadowRadius: 18, shadowOffset: { width: 0, height: 10 } },
+  sheetHandle: { alignSelf: 'center', width: 42, height: 4, borderRadius: 2, backgroundColor: 'rgba(14,116,144,0.22)', marginBottom: 10 },
+  sheetHeader: { minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  sheetTitle: { color: '#071735', fontSize: 17, fontWeight: '900' },
+  sheetClose: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(14,116,144,0.08)' },
+  sheetCloseText: { color: '#071735', fontSize: 22, fontWeight: '800', lineHeight: 24 },
+  memberRow: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: 1, borderTopColor: 'rgba(14,116,144,0.12)' },
+  memberAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#d9f2ff', borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  memberAvatarAlt: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#cce7ee', borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  memberAvatarText: { color: '#071735', fontSize: 17, fontWeight: '900' },
+  memberMain: { flex: 1 },
+  memberName: { color: '#071735', fontSize: 14, fontWeight: '900' },
+  memberRole: { color: '#0786a6', fontSize: 11, fontWeight: '900', marginTop: 2 },
+  memberRowMuted: { minHeight: 34, justifyContent: 'center', borderTopWidth: 1, borderTopColor: 'rgba(14,116,144,0.12)' },
+  memberMutedText: { color: 'rgba(7,23,53,0.64)', fontSize: 12, fontWeight: '800' },
+  inviteButton: { height: 44, borderRadius: 12, marginTop: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#008ba5' },
+  inviteButtonText: { color: colors.white, fontSize: 15, fontWeight: '900' },
+  alert: { position: 'absolute', left: 18, right: 18, bottom: 92, minHeight: 56, padding: 9, borderRadius: 16, backgroundColor: 'rgba(244,252,255,0.94)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.86)', flexDirection: 'row', alignItems: 'center', gap: 9, shadowColor: '#075985', shadowOpacity: 0.14, shadowRadius: 12, shadowOffset: { width: 0, height: 7 } },
+  alertIconWrap: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  alertIcon: { color: '#fb6a21', fontSize: 31, fontWeight: '900' },
   alertMain: { flex: 1 },
-  alertTitle: { color: '#071735', fontSize: 14, fontWeight: '900' },
-  alertText: { color: '#071735', fontSize: 12, fontWeight: '800', marginTop: 3 },
-  reviewButton: { minWidth: 98, height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#008ba5' },
-  reviewText: { color: colors.white, fontSize: 16, fontWeight: '900' },
-  shortcutsLeft: { position: 'absolute', left: 20, top: '22%', gap: 30 },
-  shortcutsRight: { position: 'absolute', right: 20, top: '22%', gap: 30 },
-  shortcut: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.22)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.88)' },
+  alertTitle: { color: '#071735', fontSize: 13, fontWeight: '900' },
+  alertText: { color: '#071735', fontSize: 11, fontWeight: '800', marginTop: 3 },
+  reviewButton: { minWidth: 88, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#008ba5' },
+  reviewText: { color: colors.white, fontSize: 15, fontWeight: '900' },
+  shortcutsLeft: { position: 'absolute', left: 20, top: '23%', gap: 22 },
+  shortcutsRight: { position: 'absolute', right: 20, top: '23%', gap: 22 },
+  shortcut: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.88)' },
   shortcutText: { color: colors.ink, fontSize: 9, fontWeight: '800', marginTop: 2, maxWidth: 50 },
-  syncWrap: { position: 'absolute', left: 2, right: 2, bottom: 184, opacity: 0.78 },
   emptyActions: { position: 'absolute', left: 24, right: 24, top: '42%', alignItems: 'center' },
   emptyTitle: { color: colors.ink, fontSize: 22, fontWeight: '900', marginBottom: 18 },
   emptyButtons: { flexDirection: 'row', gap: 10 },
@@ -320,7 +383,7 @@ const styles = StyleSheet.create({
   primaryText: { color: colors.white, fontWeight: '900' },
   secondaryBtn: { minWidth: 132, paddingVertical: 13, alignItems: 'center', borderRadius: 14, backgroundColor: colors.panelStrong, borderWidth: 1, borderColor: colors.line },
   secondaryText: { color: colors.accent, fontWeight: '900' },
-  bottomNav: { position: 'absolute', left: 18, right: 18, bottom: 18, height: 76, borderRadius: 20, backgroundColor: 'rgba(244,252,255,0.94)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.88)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', shadowColor: '#075985', shadowOpacity: 0.16, shadowRadius: 14, shadowOffset: { width: 0, height: 8 } },
-  navItem: { flex: 1, height: 58, alignItems: 'center', justifyContent: 'center', gap: 3, borderRightWidth: 1, borderRightColor: 'rgba(14,116,144,0.16)' },
-  navText: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  bottomNav: { position: 'absolute', left: 12, right: 12, bottom: 18, height: 58, borderRadius: 16, backgroundColor: 'rgba(244,252,255,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.88)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', shadowColor: '#075985', shadowOpacity: 0.14, shadowRadius: 14, shadowOffset: { width: 0, height: 8 } },
+  navItem: { flex: 1, height: 48, alignItems: 'center', justifyContent: 'center', gap: 2, borderRightWidth: 1, borderRightColor: 'rgba(14,116,144,0.12)' },
+  navText: { color: colors.ink, fontSize: 12, fontWeight: '600' },
 })
