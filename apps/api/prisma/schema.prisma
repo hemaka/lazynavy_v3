@@ -28,6 +28,8 @@ model User {
   discoveryUnlocks DiscoveryUnlock[]
   poiConfirms  PoiConfirm[]
   rewardLedger RewardLedger[]
+  manuals      ManualDocument[]
+  notifications Notification[]
 }
 
 model Vessel {
@@ -60,6 +62,7 @@ model Vessel {
   logEntries   LogEntry[]
   supplies     SupplyItem[]
   equipment    Equipment[]
+  manuals      ManualDocument[]
   discoveryUnlocks DiscoveryUnlock[]
   rewardLedger RewardLedger[]
 
@@ -369,6 +372,7 @@ model Equipment {
   vessel   Vessel @relation(fields: [vesselId], references: [id])
   template EquipmentTemplate? @relation(fields: [templateId], references: [id])
   maintenanceRecords MaintenanceRecord[]
+  manuals ManualDocument[]
 
   @@index([vesselId, status])
   @@index([nextDueAt])
@@ -397,6 +401,57 @@ model MaintenanceRecord {
   @@index([vesselId, status])
   @@index([equipmentId, createdAt])
   @@index([dueAt])
+}
+
+model ManualDocument {
+  id          String   @id @default(uuid())
+  ownerId     String
+  vesselId    String?
+  equipmentId String?
+  voyageId    String?
+  title       String
+  type        String   @default("knowledge")
+  language    String?
+  source      String?
+  mediaUrl    String?
+  contentText String?
+  metadata    Json?
+  offlinePriority String @default("normal")
+  version     Int      @default(1)
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner     User       @relation(fields: [ownerId], references: [id])
+  vessel    Vessel?    @relation(fields: [vesselId], references: [id])
+  equipment Equipment? @relation(fields: [equipmentId], references: [id])
+
+  @@index([ownerId, deletedAt])
+  @@index([vesselId, type])
+  @@index([equipmentId, type])
+  @@index([voyageId, type])
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String
+  vesselId    String?
+  sourceType  String
+  sourceId    String
+  type        String
+  title       String
+  body        String?
+  status      String   @default("unread")
+  severity    String   @default("info")
+  payload     Json?
+  createdAt   DateTime @default(now())
+  readAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, sourceType, sourceId, type])
+  @@index([userId, status, createdAt])
+  @@index([vesselId, createdAt])
 }
 
 model RewardRule {

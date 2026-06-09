@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common'
 import { randomBytes } from 'node:crypto'
 import { PrismaService } from '../../prisma/prisma.service'
+import { NotificationsService } from '../notifications/notifications.service'
 import { RewardsService } from '../rewards/rewards.service'
 
 const ROLE_TEMPLATES = [
@@ -51,6 +52,7 @@ export interface CreateInvitationInput {
 export class VesselsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
     private readonly rewards: RewardsService,
   ) {}
 
@@ -146,9 +148,20 @@ export class VesselsService {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const code = randomBytes(4).toString('hex').toUpperCase()
       try {
-        return await this.prisma.vesselInvitation.create({
+        const invitation = await this.prisma.vesselInvitation.create({
           data: { vesselId, invitedById: actorId, role, code, expiresAt },
         })
+        await this.notifications.notify({
+          userId: actorId,
+          vesselId,
+          sourceType: 'vessel_invitation',
+          sourceId: invitation.id,
+          type: 'boat.invitation.created',
+          title: 'Boat invite created',
+          body: `Invite code ${invitation.code} is ready for ${role}.`,
+          payload: { code: invitation.code, role },
+        })
+        return invitation
       } catch (err: any) {
         if (err?.code !== 'P2002') throw err
       }
@@ -186,6 +199,16 @@ export class VesselsService {
       if (user && !user.currentVesselId) {
         await tx.user.update({ where: { id: userId }, data: { currentVesselId: invite.vesselId } })
       }
+      await this.notifications.notify({
+        userId: invite.vessel.ownerId,
+        vesselId: invite.vesselId,
+        sourceType: 'vessel_invitation',
+        sourceId: invite.id,
+        type: 'boat.invitation.claimed',
+        title: 'Crew joined boat',
+        body: `${userId} joined ${invite.vessel.name} as ${invite.role}.`,
+        payload: { userId, role: invite.role },
+      })
       return { vessel: invite.vessel, membership }
     })
   }

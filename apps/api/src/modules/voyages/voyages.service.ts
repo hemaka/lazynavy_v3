@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
+import { NotificationsService } from '../notifications/notifications.service'
 import { RewardsService } from '../rewards/rewards.service'
 import { VesselsService } from '../vessels/vessels.service'
 
@@ -24,6 +25,7 @@ const DEFAULT_PRE_VOYAGE_CHECKS = [
 export class VoyagesService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
     private readonly rewards: RewardsService,
     private readonly vessels: VesselsService,
   ) {}
@@ -104,6 +106,17 @@ export class VoyagesService {
       orderBy: { sortOrder: 'asc' },
     })
     if (incompleteChecks.length > 0 && !input.skipChecklistWarning) {
+      await this.notifications.notify({
+        userId,
+        vesselId: voyage.vesselId,
+        sourceType: 'voyage',
+        sourceId: voyageId,
+        type: 'voyage.checklist.incomplete',
+        title: 'Pre-voyage checklist incomplete',
+        body: `${incompleteChecks.length} checks are still open before departure.`,
+        severity: 'warning',
+        payload: { incompleteChecklistItems: incompleteChecks },
+      })
       throw new BadRequestException({
         message: 'Pre-voyage checklist is incomplete',
         incompleteChecklistItems: incompleteChecks,

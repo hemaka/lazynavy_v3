@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
+import { NotificationsService } from '../notifications/notifications.service'
 import { RewardsService } from '../rewards/rewards.service'
 import { VesselsService } from '../vessels/vessels.service'
 
@@ -36,6 +37,7 @@ export interface CreateMaintenanceInput {
 export class EquipmentService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
     private readonly vessels: VesselsService,
     private readonly rewards: RewardsService,
   ) {}
@@ -77,10 +79,27 @@ export class EquipmentService {
     await this.vessels.ensureUserVessel(userId, filters.vesselId)
     const until = new Date()
     until.setDate(until.getDate() + Math.max(0, filters.withinDays ?? 30))
-    return this.prisma.equipment.findMany({
+    const items = await this.prisma.equipment.findMany({
       where: { vesselId: filters.vesselId, deletedAt: null, nextDueAt: { lte: until } },
       orderBy: [{ nextDueAt: 'asc' }],
     })
+    const vessel = await this.prisma.vessel.findUnique({ where: { id: filters.vesselId } })
+    if (vessel) {
+      for (const item of items) {
+        await this.notifications.notify({
+          userId: vessel.ownerId,
+          vesselId: vessel.id,
+          sourceType: 'equipment',
+          sourceId: item.id,
+          type: 'maintenance.due',
+          title: 'Maintenance due',
+          body: `${item.name} needs maintenance.`,
+          severity: 'warning',
+          payload: { nextDueAt: item.nextDueAt },
+        })
+      }
+    }
+    return items
   }
 
   async get(userId: string, equipmentId: string) {
@@ -203,6 +222,16 @@ export class EquipmentService {
           vesselId: equipment.vesselId,
           sourceType: 'maintenance',
           sourceId: record.id,
+        })
+        await this.notifications.notify({
+          userId,
+          vesselId: equipment.vesselId,
+          sourceType: 'maintenance',
+          sourceId: record.id,
+          type: 'maintenance.completed',
+          title: 'Maintenance recorded',
+          body: `${record.title} was completed.`,
+          severity: 'info',
         })
       }
       return record

@@ -30,6 +30,7 @@ async function main() {
   const createdEquipmentTemplateIds: string[] = []
   const createdEquipmentIds: string[] = []
   const createdMaintenanceIds: string[] = []
+  const createdManualIds: string[] = []
   let app: INestApplication | null = null
 
   try {
@@ -172,6 +173,7 @@ async function main() {
     assert.ok(lowStock.some((item) => item.id === supply.id))
     const adjustedSupply = await patch<Json>(`${baseUrl}/vessels/${vessel.id}/supplies/${supply.id}/adjust?userId=${captain.id}`, { delta: 60 })
     assert.equal(adjustedSupply.quantity, 80)
+    await patch<Json>(`${baseUrl}/vessels/${vessel.id}/supplies/${supply.id}/adjust?userId=${captain.id}`, { delta: -40 })
 
     console.log('v3-core selftest: equipment and maintenance')
     const equipmentTemplate = await post<Json>(`${baseUrl}/equipment-templates`, {
@@ -199,6 +201,30 @@ async function main() {
     const dueEquipment = await get<Json[]>(`${baseUrl}/equipment/due?vesselId=${vessel.id}&withinDays=10&userId=${captain.id}`)
     assert.ok(dueEquipment.some((item) => item.id === equipment.id))
 
+    console.log('v3-core selftest: manuals and documents')
+    const vesselManual = await post<Json>(`${baseUrl}/manuals?userId=${captain.id}`, {
+      vesselId: vessel.id,
+      title: `Selftest Vessel Manual ${suffix}`,
+      type: 'vessel_manual',
+      contentText: 'Engine startup and safety checklist',
+      offlinePriority: 'high',
+    })
+    createdManualIds.push(vesselManual.id)
+    const equipmentManual = await post<Json>(`${baseUrl}/manuals?userId=${captain.id}`, {
+      vesselId: vessel.id,
+      equipmentId: equipment.id,
+      title: `Selftest Engine Manual ${suffix}`,
+      type: 'equipment_manual',
+      contentText: 'Oil filter replacement and belt inspection',
+    })
+    createdManualIds.push(equipmentManual.id)
+    const vesselManuals = await get<Json[]>(`${baseUrl}/vessels/${vessel.id}/manuals?userId=${captain.id}`)
+    assert.ok(vesselManuals.some((item) => item.id === vesselManual.id))
+    const equipmentManuals = await get<Json[]>(`${baseUrl}/equipment/${equipment.id}/manuals?userId=${captain.id}`)
+    assert.ok(equipmentManuals.some((item) => item.id === equipmentManual.id))
+    const searchManuals = await get<Json[]>(`${baseUrl}/manuals/search?q=filter&userId=${captain.id}`)
+    assert.ok(searchManuals.some((item) => item.id === equipmentManual.id))
+
     const serviceRecord = await post<Json>(`${baseUrl}/equipment/${equipment.id}/maintenance?userId=${captain.id}`, {
       type: 'service',
       status: 'done',
@@ -220,6 +246,14 @@ async function main() {
     assert.ok((equipmentDetail.maintenanceRecords as Json[]).some((item) => item.id === serviceRecord.id))
     const maintenanceLedger = await get<Json[]>(`${baseUrl}/rewards/ledger?userId=${captain.id}`)
     assert.ok(maintenanceLedger.some((item) => item.ruleKey === 'maintenance.completed' && item.sourceId === serviceRecord.id))
+    const unreadNotifications = await get<Json[]>(`${baseUrl}/notifications?status=unread&userId=${captain.id}`)
+    assert.ok(unreadNotifications.some((item) => item.type === 'boat.invitation.created'))
+    assert.ok(unreadNotifications.some((item) => item.type === 'boat.invitation.claimed'))
+    assert.ok(unreadNotifications.some((item) => item.type === 'voyage.checklist.incomplete'))
+    assert.ok(unreadNotifications.some((item) => item.type === 'supply.low_stock'))
+    assert.ok(unreadNotifications.some((item) => item.type === 'maintenance.due'))
+    assert.ok(unreadNotifications.some((item) => item.type === 'maintenance.completed'))
+    await patch<Json>(`${baseUrl}/notifications/${unreadNotifications[0].id}/read?userId=${captain.id}`, {})
     const deletedEquipment = await del<Json>(`${baseUrl}/equipment/${equipment.id}?userId=${captain.id}`)
     assert.ok(deletedEquipment.deletedAt)
 
@@ -288,6 +322,8 @@ async function main() {
       await prisma.rewardLedger.deleteMany({ where: { OR: [{ userId: { in: createdUserIds } }, { vesselId: { in: createdVesselIds } }] } })
       await prisma.logEntry.deleteMany({ where: { id: { in: createdLogIds } } })
       await prisma.supplyItem.deleteMany({ where: { id: { in: createdSupplyIds } } })
+      await prisma.notification.deleteMany({ where: { userId: { in: createdUserIds } } })
+      await prisma.manualDocument.deleteMany({ where: { id: { in: createdManualIds } } })
       await prisma.maintenanceRecord.deleteMany({ where: { id: { in: createdMaintenanceIds } } })
       await prisma.equipment.deleteMany({ where: { id: { in: createdEquipmentIds } } })
       await prisma.equipmentTemplate.deleteMany({ where: { id: { in: createdEquipmentTemplateIds } } })

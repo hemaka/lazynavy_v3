@@ -17,6 +17,7 @@ import {
   type VesselSetupStep,
 } from './api'
 import { completeService, createEquipment, listDueEquipment, listEquipment, type EquipmentItem } from './equipmentApi'
+import { createVesselManual, listVesselManuals, searchManuals, type ManualDocument } from './manualsApi'
 import { adjustSupply, createSupply, listSupplies, type SupplyItem } from './suppliesApi'
 
 const labels: Record<string, string> = {
@@ -38,6 +39,8 @@ export function BoatSectionScreen() {
   if (section === 'overview') return <OverviewScreen />
   if (section === 'supplies') return <SuppliesScreen />
   if (section === 'equipment') return <EquipmentScreen />
+  if (section === 'documents') return <ManualsScreen mode="documents" />
+  if (section === 'manuals') return <ManualsScreen mode="manuals" />
   if (section === 'join') return <JoinScreen />
   const title = labels[section] ?? 'Boat Module'
   return (
@@ -318,6 +321,90 @@ function EquipmentScreen() {
                 </View>
                 <Text style={styles.cardMeta}>Next due {item.nextDueAt ? new Date(item.nextDueAt).toLocaleDateString() : '-'}</Text>
                 <Pressable disabled={busy} style={styles.secondary} onPress={() => service(item)}><Text style={styles.secondaryText}>Record Service</Text></Pressable>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    </LinearGradient>
+  )
+}
+
+function ManualsScreen({ mode }: { mode: 'manuals' | 'documents' }) {
+  const [vesselId, setVesselId] = useState<string | null>(null)
+  const [items, setItems] = useState<ManualDocument[]>([])
+  const [query, setQuery] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function load() {
+    setLoading(true)
+    setError(null)
+    try {
+      const hud = await getCaptainHud()
+      const id = hud.currentVessel?.id ?? null
+      setVesselId(id)
+      setItems(id ? await listVesselManuals(id) : [])
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load manuals')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { void load() }, [])
+
+  async function add() {
+    if (!vesselId) return
+    setBusy(true)
+    try {
+      await createVesselManual(vesselId, mode === 'manuals' ? 'vessel_manual' : 'certificate')
+      await load()
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to add document')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function search() {
+    setBusy(true)
+    try {
+      setItems(query.trim() ? await searchManuals(query) : vesselId ? await listVesselManuals(vesselId) : [])
+    } catch (err: any) {
+      setError(err?.message ?? 'Search failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <LinearGradient colors={[colors.skyBottom, '#ffffff']} style={styles.screen}>
+      <SafeAreaView style={styles.safe}>
+        <Header title={mode === 'manuals' ? 'Manuals' : 'Documents'} />
+        {loading ? <ActivityIndicator color={colors.accent} /> : (
+          <ScrollView contentContainerStyle={styles.content}>
+            {error && <Text style={styles.error}>{error}</Text>}
+            <View style={styles.card}>
+              <TextInput value={query} onChangeText={setQuery} placeholder="Search onboard docs" style={styles.input} />
+              <View style={styles.actions}>
+                <Pressable disabled={busy} style={styles.secondary} onPress={search}><Text style={styles.secondaryText}>Search</Text></Pressable>
+                <Pressable disabled={!vesselId || busy} style={[styles.primary, (!vesselId || busy) && styles.disabled]} onPress={add}>
+                  <Text style={styles.primaryText}>{mode === 'manuals' ? 'Add Manual' : 'Add Document'}</Text>
+                </Pressable>
+              </View>
+            </View>
+            {items.map((item) => (
+              <View key={item.id} style={styles.card}>
+                <View style={styles.cardHead}>
+                  <View>
+                    <Text style={styles.cardTitle}>{item.title}</Text>
+                    <Text style={styles.cardMeta}>{item.type} · offline {item.offlinePriority}</Text>
+                  </View>
+                  <Text style={styles.badge}>{item.offlinePriority}</Text>
+                </View>
+                {item.contentText && <Text style={styles.cardMeta}>{item.contentText}</Text>}
               </View>
             ))}
           </ScrollView>

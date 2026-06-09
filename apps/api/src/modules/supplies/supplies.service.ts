@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
+import { NotificationsService } from '../notifications/notifications.service'
 import { VesselsService } from '../vessels/vessels.service'
 
 export interface UpsertSupplyInput {
@@ -17,6 +18,7 @@ export interface UpsertSupplyInput {
 export class SuppliesService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
     private readonly vessels: VesselsService,
   ) {}
 
@@ -48,10 +50,26 @@ export class SuppliesService {
     const item = await this.prisma.supplyItem.findUnique({ where: { id: itemId } })
     if (!item) throw new BadRequestException('Supply item not found')
     await this.vessels.ensureUserVessel(userId, item.vesselId)
-    return this.prisma.supplyItem.update({
+    const updated = await this.prisma.supplyItem.update({
       where: { id: itemId },
       data: { quantity: Math.max(0, item.quantity + delta) },
     })
+    if (updated.warnBelow !== null && updated.quantity <= updated.warnBelow) {
+      const vessel = await this.prisma.vessel.findUnique({ where: { id: updated.vesselId } })
+      if (vessel) {
+        await this.notifications.notify({
+          userId: vessel.ownerId,
+          vesselId: updated.vesselId,
+          sourceType: 'supply',
+          sourceId: updated.id,
+          type: 'supply.low_stock',
+          title: 'Supply low stock',
+          body: `${updated.name} is at ${updated.quantity} ${updated.unit}.`,
+          severity: 'warning',
+        })
+      }
+    }
+    return updated
   }
 
   async lowStock(userId: string, vesselId: string) {

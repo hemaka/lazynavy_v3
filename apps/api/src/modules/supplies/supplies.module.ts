@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common'
 import { IdentityModule } from '../identity/identity.module'
+import { NotificationsModule } from '../notifications/notifications.module'
 import { VesselsModule } from '../vessels/vessels.module'
 import { SuppliesController } from './supplies.controller'
 import { SuppliesService } from './supplies.service'
 
 @Module({
-  imports: [IdentityModule, VesselsModule],
+  imports: [IdentityModule, NotificationsModule, VesselsModule],
   controllers: [SuppliesController],
   providers: [SuppliesService],
 })
