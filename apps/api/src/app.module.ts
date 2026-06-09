@@ -14,8 +14,9 @@ import { SuppliesModule } from './modules/supplies/supplies.module'
 import { ToolboxModule } from './modules/toolbox/toolbox.module'
 import { VesselsModule } from './modules/vessels/vessels.module'
 import { VoyagesModule } from './modules/voyages/voyages.module'
+import { WeatherModule } from './modules/weather/weather.module'
 
 @Module({
-  imports: [PrismaModule, HealthModule, IdentityModule, VesselsModule, VoyagesModule, RewardsModule, LogsModule, PlacesModule, SuppliesModule, EquipmentModule, ManualsModule, MessagingModule, NotificationsModule, ToolboxModule, HomeModule],
+  imports: [PrismaModule, HealthModule, IdentityModule, VesselsModule, VoyagesModule, RewardsModule, LogsModule, PlacesModule, SuppliesModule, EquipmentModule, ManualsModule, MessagingModule, NotificationsModule, ToolboxModule, WeatherModule, HomeModule],
 })
 export class AppModule {}

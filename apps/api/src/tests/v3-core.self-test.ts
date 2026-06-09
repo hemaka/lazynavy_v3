@@ -62,6 +62,10 @@ async function main() {
     assert.ok(currencyConversion.result > 0)
     const regionInfo = await get<Json>(`${baseUrl}/toolbox/region?code=US`)
     assert.equal(regionInfo.vhfEmergency, 'VHF 16')
+    const marineWeather = await get<Json>(`${baseUrl}/weather/marine?lat=37.8&lng=-122.4`)
+    assert.equal(marineWeather.source, 'static-marine-default')
+    const crewContext = await get<Json>(`${baseUrl}/weather/crew-context?vesselStatus=docked`)
+    assert.equal(crewContext.suggestedCrewStatus, 'ashore')
 
     console.log('v3-core selftest: create vessel')
     const vesselModel = await post<Json>(`${baseUrl}/vessels/models`, {
