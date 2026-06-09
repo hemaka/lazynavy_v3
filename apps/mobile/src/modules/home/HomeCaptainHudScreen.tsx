@@ -83,7 +83,6 @@ export function HomeCaptainHudScreen() {
               <View style={styles.playerRow}>
                 <Text numberOfLines={1} style={styles.playerName}>{hud.user.nickname}</Text>
                 <Text style={styles.level}>Lv. {hud.user.level}</Text>
-                <View style={styles.titleWrap}><Text style={styles.titleIcon}>✧</Text><Text numberOfLines={1} style={styles.title}>{hud.user.title}</Text></View>
               </View>
               <Text style={styles.xpText}>{hud.user.xp.toLocaleString()} / {hud.user.nextLevelXp.toLocaleString()} XP</Text>
               <View style={styles.xpTrack}><View style={[styles.xpFill, { width: `${xpPercent * 100}%` }]} /></View>
@@ -277,9 +276,6 @@ const styles = StyleSheet.create({
   playerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 24 },
   playerName: { color: '#071735', fontSize: 18, fontWeight: '900', maxWidth: width * 0.22 },
   level: { color: '#071735', fontSize: 11, fontWeight: '900', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, borderWidth: 1, borderColor: 'rgba(18,48,71,0.18)', overflow: 'hidden' },
-  titleWrap: { flex: 1, minWidth: 0, marginLeft: 4, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  titleIcon: { color: '#0891b2', fontSize: 16, fontWeight: '900' },
-  title: { flex: 1, color: '#0786a6', fontSize: 12, fontWeight: '900' },
   xpText: { color: '#071735', fontSize: 12, fontWeight: '900', marginTop: 3 },
   xpTrack: { height: 4, borderRadius: 2, backgroundColor: 'rgba(14,116,144,0.22)', overflow: 'hidden', marginTop: 6, maxWidth: width * 0.44 },
   xpFill: { height: '100%', backgroundColor: '#10b8bd', borderRadius: 2 },
