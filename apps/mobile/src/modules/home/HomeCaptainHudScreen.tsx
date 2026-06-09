@@ -77,14 +77,12 @@ export function HomeCaptainHudScreen() {
           <View style={styles.playerHud}>
             <View style={styles.avatarWrap}>
               <View style={styles.avatar}><Text style={styles.avatarText}>{hud.user.nickname.slice(0, 1)}</Text></View>
-              <View style={styles.rankBadge}><Text style={styles.rankText}>Lv. {hud.user.level}</Text></View>
             </View>
             <View style={styles.playerMain}>
               <View style={styles.playerRow}>
                 <Text numberOfLines={1} style={styles.playerName}>{hud.user.nickname}</Text>
-                <Text style={styles.level}>Lv. {hud.user.level}</Text>
               </View>
-              <Text style={styles.xpText}>{hud.user.xp.toLocaleString()} / {hud.user.nextLevelXp.toLocaleString()} XP</Text>
+              <Text style={styles.xpText}>Lv. {hud.user.level} · {hud.user.xp.toLocaleString()} / {hud.user.nextLevelXp.toLocaleString()} XP</Text>
               <View style={styles.xpTrack}><View style={[styles.xpFill, { width: `${xpPercent * 100}%` }]} /></View>
             </View>
           </View>
@@ -266,12 +264,10 @@ const styles = StyleSheet.create({
   sailSmall: { position: 'absolute', left: '24%', bottom: 66, width: 0, height: 0, borderLeftWidth: 48, borderRightWidth: 0, borderBottomWidth: 94, borderLeftColor: 'transparent', borderBottomColor: 'rgba(232,247,255,0.94)' },
   cabin: { position: 'absolute', left: '34%', right: '24%', bottom: 42, height: 22, borderTopLeftRadius: 12, borderTopRightRadius: 12, backgroundColor: 'rgba(255,255,255,0.94)' },
   hull: { position: 'absolute', bottom: 26, left: '18%', right: '11%', height: 30, borderBottomLeftRadius: 34, borderBottomRightRadius: 34, backgroundColor: 'rgba(255,255,255,0.96)', borderBottomWidth: 4, borderBottomColor: '#0f5471' },
-  playerHud: { marginLeft: 18, marginRight: 92, marginTop: 18, minHeight: 68, paddingLeft: 74, paddingRight: 12, paddingVertical: 9, borderRadius: 22, backgroundColor: 'rgba(235,248,255,0.72)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.72)', flexDirection: 'row', alignItems: 'center', shadowColor: '#075985', shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
+  playerHud: { marginLeft: 18, marginRight: 92, marginTop: 18, minHeight: 68, paddingLeft: 68, paddingRight: 12, paddingVertical: 9, borderRadius: 22, backgroundColor: 'rgba(235,248,255,0.72)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.72)', flexDirection: 'row', alignItems: 'center', shadowColor: '#075985', shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
   avatarWrap: { position: 'absolute', left: -6, top: -4, width: 76, height: 76 },
   avatar: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#bfe9ff', borderWidth: 4, borderColor: colors.white, alignItems: 'center', justifyContent: 'center', shadowColor: '#075985', shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
   avatarText: { color: colors.ink, fontWeight: '900', fontSize: 26 },
-  rankBadge: { position: 'absolute', left: 1, bottom: 7, minWidth: 44, height: 24, paddingHorizontal: 7, borderRadius: 8, backgroundColor: 'rgba(235,248,255,0.92)', borderWidth: 1, borderColor: 'rgba(18,48,71,0.18)', alignItems: 'center', justifyContent: 'center' },
-  rankText: { color: '#071735', fontSize: 11, fontWeight: '900' },
   playerMain: { flex: 1 },
   playerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 24 },
   playerName: { color: '#071735', fontSize: 16, fontWeight: '900', maxWidth: width * 0.22 },
