@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Tex
 import { getCaptainHud } from '../home/api'
 import { listVoyages } from '../voyage/api'
 import { colors } from '../../theme/tokens'
-import { createLog, listLogs, type LogEntry } from './api'
+import { cacheLogs, createLog, createLogOffline, listCachedLogs, listLogs, type LogEntry } from './api'
 
 export function LogScreen() {
   const [logs, setLogs] = useState<LogEntry[]>([])
@@ -23,8 +23,11 @@ export function LogScreen() {
       setVesselId(hud.currentVessel?.id ?? null)
       setVoyageId(voyages.find((item) => item.status === 'active' || item.status === 'completed')?.id ?? null)
       setLogs(nextLogs)
+      await cacheLogs(nextLogs)
     } catch (err: any) {
-      setError(err?.message ?? 'Failed to load logs')
+      const cached = await listCachedLogs(vesselId)
+      setLogs(cached)
+      setError(cached.length ? 'Using local cache' : err?.message ?? 'Failed to load logs')
     } finally {
       setLoading(false)
     }
@@ -39,7 +42,13 @@ export function LogScreen() {
       await createLog(vesselId, voyageId)
       await load()
     } catch (err: any) {
-      setError(err?.message ?? 'Failed to create log')
+      try {
+        const local = await createLogOffline(vesselId, voyageId)
+        setLogs((current) => [local, ...current])
+        setError('Saved locally. Sync will retry when online.')
+      } catch (offlineErr: any) {
+        setError(offlineErr?.message ?? err?.message ?? 'Failed to create log')
+      }
     } finally {
       setBusy(false)
     }

@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native'
 import type { CaptainHudResponse } from '@lazynavy-v3/types'
+import { SyncStatusBar } from '../../features/offline/SyncStatusBar'
 import { bottomNav } from '../../navigation/navConfig'
 import { IconGlyph } from '../../shared/ui/IconGlyph'
 import { colors } from '../../theme/tokens'
@@ -88,6 +89,7 @@ export function HomeCaptainHudScreen() {
             </Pressable>
           </View>
         )}
+        {hud.user && <SyncStatusBar />}
 
         {hasBoat ? (
           <>
