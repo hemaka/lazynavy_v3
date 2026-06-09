@@ -16,10 +16,37 @@ import {
   type VesselInvitation,
   type VesselSetupStep,
 } from './api'
-import { completeService, createEquipment, listDueEquipment, listEquipment, type EquipmentItem } from './equipmentApi'
-import { createVesselManual, listVesselManuals, searchManuals, type ManualDocument } from './manualsApi'
+import {
+  cacheEquipment,
+  completeService,
+  completeServiceOffline,
+  createEquipment,
+  createEquipmentOffline,
+  listCachedEquipment,
+  listDueEquipment,
+  listEquipment,
+  type EquipmentItem,
+} from './equipmentApi'
+import {
+  cacheManuals,
+  createVesselManual,
+  createVesselManualOffline,
+  listCachedManuals,
+  listVesselManuals,
+  searchManuals,
+  type ManualDocument,
+} from './manualsApi'
 import { listChatMessages, listChatThreads, sendChatMessage, type ChatMessage, type ChatThread } from './messagingApi'
-import { adjustSupply, createSupply, listSupplies, type SupplyItem } from './suppliesApi'
+import {
+  adjustSupply,
+  adjustSupplyOffline,
+  cacheSupplies,
+  createSupply,
+  createSupplyOffline,
+  listCachedSupplies,
+  listSupplies,
+  type SupplyItem,
+} from './suppliesApi'
 
 const labels: Record<string, string> = {
   overview: 'Boat Overview',
@@ -280,12 +307,16 @@ function EquipmentScreen() {
         const [nextItems, nextDue] = await Promise.all([listEquipment(id), listDueEquipment(id)])
         setItems(nextItems)
         setDue(nextDue)
+        await cacheEquipment(nextItems)
       } else {
         setItems([])
         setDue([])
       }
     } catch (err: any) {
-      setError(err?.message ?? 'Failed to load equipment')
+      const cached = await listCachedEquipment(vesselId)
+      setItems(cached)
+      setDue(cached.filter((item) => item.nextDueAt && new Date(item.nextDueAt).getTime() <= Date.now() + 45 * 24 * 60 * 60 * 1000))
+      setError(cached.length ? 'Using local cache' : err?.message ?? 'Failed to load equipment')
     } finally {
       setLoading(false)
     }
@@ -300,7 +331,14 @@ function EquipmentScreen() {
       await createEquipment(vesselId)
       await load()
     } catch (err: any) {
-      setError(err?.message ?? 'Failed to add equipment')
+      try {
+        const local = await createEquipmentOffline(vesselId)
+        setItems((current) => [local, ...current])
+        setDue((current) => [local, ...current])
+        setError('Saved locally. Sync will retry when online.')
+      } catch (offlineErr: any) {
+        setError(offlineErr?.message ?? err?.message ?? 'Failed to add equipment')
+      }
     } finally {
       setBusy(false)
     }
@@ -312,7 +350,14 @@ function EquipmentScreen() {
       await completeService(item.id)
       await load()
     } catch (err: any) {
-      setError(err?.message ?? 'Failed to record service')
+      try {
+        const next = await completeServiceOffline(item)
+        setItems((current) => current.map((entry) => entry.id === next.id ? next : entry))
+        setDue((current) => current.filter((entry) => entry.id !== next.id))
+        setError('Saved locally. Sync will retry when online.')
+      } catch (offlineErr: any) {
+        setError(offlineErr?.message ?? err?.message ?? 'Failed to record service')
+      }
     } finally {
       setBusy(false)
     }
@@ -367,9 +412,13 @@ function ManualsScreen({ mode }: { mode: 'manuals' | 'documents' }) {
       const hud = await getCaptainHud()
       const id = hud.currentVessel?.id ?? null
       setVesselId(id)
-      setItems(id ? await listVesselManuals(id) : [])
+      const nextItems = id ? await listVesselManuals(id) : []
+      setItems(nextItems)
+      if (id) await cacheManuals(nextItems, id)
     } catch (err: any) {
-      setError(err?.message ?? 'Failed to load manuals')
+      const cached = await listCachedManuals(vesselId)
+      setItems(cached)
+      setError(cached.length ? 'Using local cache' : err?.message ?? 'Failed to load manuals')
     } finally {
       setLoading(false)
     }
@@ -384,7 +433,13 @@ function ManualsScreen({ mode }: { mode: 'manuals' | 'documents' }) {
       await createVesselManual(vesselId, mode === 'manuals' ? 'vessel_manual' : 'certificate')
       await load()
     } catch (err: any) {
-      setError(err?.message ?? 'Failed to add document')
+      try {
+        const local = await createVesselManualOffline(vesselId, mode === 'manuals' ? 'vessel_manual' : 'certificate')
+        setItems((current) => [local, ...current])
+        setError('Saved locally. Sync will retry when online.')
+      } catch (offlineErr: any) {
+        setError(offlineErr?.message ?? err?.message ?? 'Failed to add document')
+      }
     } finally {
       setBusy(false)
     }
@@ -395,7 +450,10 @@ function ManualsScreen({ mode }: { mode: 'manuals' | 'documents' }) {
     try {
       setItems(query.trim() ? await searchManuals(query) : vesselId ? await listVesselManuals(vesselId) : [])
     } catch (err: any) {
-      setError(err?.message ?? 'Search failed')
+      const cached = await listCachedManuals(vesselId)
+      const needle = query.trim().toLowerCase()
+      setItems(needle ? cached.filter((item) => `${item.title} ${item.type} ${item.contentText ?? ''}`.toLowerCase().includes(needle)) : cached)
+      setError(cached.length ? 'Searching local cache' : err?.message ?? 'Search failed')
     } finally {
       setBusy(false)
     }
@@ -527,9 +585,13 @@ function SuppliesScreen() {
       const hud = await getCaptainHud()
       const id = hud.currentVessel?.id ?? null
       setVesselId(id)
-      setItems(id ? await listSupplies(id) : [])
+      const nextItems = id ? await listSupplies(id) : []
+      setItems(nextItems)
+      await cacheSupplies(nextItems)
     } catch (err: any) {
-      setError(err?.message ?? 'Failed to load supplies')
+      const cached = await listCachedSupplies(vesselId)
+      setItems(cached)
+      setError(cached.length ? 'Using local cache' : err?.message ?? 'Failed to load supplies')
     } finally {
       setLoading(false)
     }
@@ -544,7 +606,13 @@ function SuppliesScreen() {
       await createSupply(vesselId)
       await load()
     } catch (err: any) {
-      setError(err?.message ?? 'Failed to add supply')
+      try {
+        const local = await createSupplyOffline(vesselId)
+        setItems((current) => [local, ...current])
+        setError('Saved locally. Sync will retry when online.')
+      } catch (offlineErr: any) {
+        setError(offlineErr?.message ?? err?.message ?? 'Failed to add supply')
+      }
     } finally {
       setBusy(false)
     }
@@ -557,7 +625,13 @@ function SuppliesScreen() {
       await adjustSupply(vesselId, item.id, delta)
       await load()
     } catch (err: any) {
-      setError(err?.message ?? 'Failed to adjust supply')
+      try {
+        const next = await adjustSupplyOffline(item, delta)
+        setItems((current) => current.map((entry) => entry.id === next.id ? next : entry))
+        setError('Saved locally. Sync will retry when online.')
+      } catch (offlineErr: any) {
+        setError(offlineErr?.message ?? err?.message ?? 'Failed to adjust supply')
+      }
     } finally {
       setBusy(false)
     }
