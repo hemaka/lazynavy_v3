@@ -75,55 +75,81 @@ export function HomeCaptainHudScreen() {
       <SafeAreaView style={styles.safe}>
         {hud.user && (
           <View style={styles.playerHud}>
-            <View style={styles.avatar}><Text style={styles.avatarText}>{hud.user.nickname.slice(0, 1)}</Text></View>
+            <View style={styles.avatarWrap}>
+              <View style={styles.avatar}><Text style={styles.avatarText}>{hud.user.nickname.slice(0, 1)}</Text></View>
+              <View style={styles.rankBadge}><Text style={styles.rankText}>⚓</Text></View>
+            </View>
             <View style={styles.playerMain}>
               <View style={styles.playerRow}>
                 <Text style={styles.playerName}>{hud.user.nickname}</Text>
-                <Text style={styles.level}>LV {hud.user.level}</Text>
+                <Text style={styles.level}>Lv. {hud.user.level}</Text>
+                <View style={styles.titleWrap}><Text style={styles.titleIcon}>✧</Text><Text style={styles.title}>{hud.user.title}</Text></View>
               </View>
+              <Text style={styles.xpText}>{hud.user.xp.toLocaleString()} / {hud.user.nextLevelXp.toLocaleString()} XP</Text>
               <View style={styles.xpTrack}><View style={[styles.xpFill, { width: `${xpPercent * 100}%` }]} /></View>
-              <Text style={styles.title}>{hud.user.title} · {hud.user.availableMileagePoints} mi · {hud.user.pendingMileagePoints} pending</Text>
             </View>
-            <Pressable style={styles.previewToggle} onPress={() => setEmptyPreview((value) => !value)}>
-              <Text style={styles.previewText}>{emptyPreview ? 'HUD' : 'Empty'}</Text>
-            </Pressable>
           </View>
         )}
-        {hud.user && <SyncStatusBar />}
+        {hud.user && (
+          <Pressable style={styles.messageButton} onPress={() => router.push('/boat/crew')}>
+            <Text style={styles.messageIcon}>▱</Text>
+            <View style={styles.messageDot} />
+          </Pressable>
+        )}
 
         {hasBoat ? (
           <>
+            <View style={styles.boatNameWrap}>
+              <Pressable style={styles.boatName} onPress={() => router.push('/boat/overview')}>
+                <Text style={styles.boatNameText}>{hud.currentVessel?.name}⌄</Text>
+              </Pressable>
+            </View>
+
             <View style={styles.conditionRow}>
-              {hud.weather.map((chip) => (
+              {hud.weather.slice(0, 3).map((chip) => (
                 <View key={chip.key} style={styles.conditionChip}>
-                  <Text style={styles.conditionLabel}>{chip.label}</Text>
+                  <Text style={styles.conditionGlyph}>{weatherGlyph(chip.key)}</Text>
                   <Text style={styles.conditionValue}>{chip.value}</Text>
                 </View>
               ))}
             </View>
 
-            <View style={styles.boatNameWrap}>
-              <Pressable style={styles.boatName} onPress={() => router.push('/boat/overview')}>
-              <Text style={styles.boatNameText}>{hud.currentVessel?.name}</Text>
-                <Text style={styles.boatNameSub}>LV {hud.currentVessel?.level} · {hud.currentVessel?.pendingMileagePoints ?? 0} pending miles</Text>
-              </Pressable>
-            </View>
-
             <View style={styles.crewStrip}>
-              <Text style={styles.crewLabel}>Captain</Text>
-              <Text style={styles.crewValue}>{hud.user?.nickname ?? 'You'}</Text>
+              <View style={styles.crewProfile}>
+                <View style={styles.crewAvatar}><Text style={styles.crewAvatarText}>⚓</Text></View>
+                <View>
+                  <Text style={styles.crewValue}>Captain {hud.user?.nickname ?? 'You'}</Text>
+                  <Text style={styles.crewLabel}>Captain</Text>
+                </View>
+              </View>
               <View style={styles.crewDivider} />
-              <Text style={styles.crewLabel}>Role</Text>
-              <Text style={styles.crewValue}>{hud.currentVessel?.userRole}</Text>
+              <View style={styles.crewProfile}>
+                <View style={styles.crewAvatarAlt}><Text style={styles.crewAvatarText}>◌</Text></View>
+                <View>
+                  <Text style={styles.crewValue}>You: <Text style={styles.crewRole}>{hud.currentVessel?.userRole}</Text></Text>
+                  <Text style={styles.crewLabel}>♨</Text>
+                </View>
+              </View>
               <View style={styles.crewDivider} />
-              <Text style={styles.crewLabel}>Crew</Text>
-              <Text style={styles.crewValue}>{hud.currentVessel?.crewCount}</Text>
+              <Pressable style={styles.crewAction} onPress={() => router.push('/boat/crew')}>
+                <Text style={styles.crewActionIcon}>♙</Text>
+                <Text style={styles.crewActionText}>{hud.currentVessel?.crewCount} crew</Text>
+              </Pressable>
+              <View style={styles.crewDivider} />
+              <Pressable style={styles.crewAction} onPress={() => router.push('/boat/crew')}>
+                <Text style={styles.crewActionIcon}>＋</Text>
+                <Text style={styles.crewActionText}>Invite</Text>
+              </Pressable>
             </View>
 
             {hud.activeVoyage?.needsConfirmation && (
               <Pressable style={styles.alert} onPress={() => router.push('/voyage')}>
-                <Text style={styles.alertTitle}>Voyage plan needs confirmation</Text>
-                <Text style={styles.alertText}>{hud.activeVoyage.name}</Text>
+                <View style={styles.alertIconWrap}><Text style={styles.alertIcon}>✧</Text></View>
+                <View style={styles.alertMain}>
+                  <Text style={styles.alertTitle}>Voyage plan needs review</Text>
+                  <Text style={styles.alertText}>● 2 changes logged</Text>
+                </View>
+                <View style={styles.reviewButton}><Text style={styles.reviewText}>Review 〉</Text></View>
               </Pressable>
             )}
 
@@ -133,6 +159,7 @@ export function HomeCaptainHudScreen() {
             <View style={styles.shortcutsRight}>
               {hud.shortcuts.filter((item) => item.pinned).slice(2, 4).map((item) => <Shortcut key={item.key} item={item} />)}
             </View>
+            <View style={styles.syncWrap}><SyncStatusBar /></View>
           </>
         ) : (
           <View style={styles.emptyActions}>
@@ -145,9 +172,9 @@ export function HomeCaptainHudScreen() {
         )}
 
         <View style={styles.bottomNav}>
-          {bottomNav.map((item) => (
+          {bottomNav.slice(0, 3).map((item) => (
             <Pressable key={item.key} style={styles.navItem} onPress={() => router.push(item.href as never)}>
-              <IconGlyph name={item.icon} color={colors.accent} size={16} />
+              <IconGlyph name={item.icon} color={colors.accent} size={26} />
               <Text style={styles.navText}>{item.label}</Text>
             </Pressable>
           ))}
@@ -160,8 +187,7 @@ export function HomeCaptainHudScreen() {
 function Shortcut({ item }: { item: { href: string; icon: string; label: string } }) {
   return (
     <Pressable style={styles.shortcut} onPress={() => router.push(item.href as never)}>
-      <IconGlyph name={item.icon} color={colors.accent} size={18} />
-      <Text numberOfLines={1} style={styles.shortcutText}>{item.label}</Text>
+      <IconGlyph name={item.icon} color={colors.white} size={30} />
     </Pressable>
   )
 }
@@ -169,17 +195,31 @@ function Shortcut({ item }: { item: { href: string; icon: string; label: string 
 function Scene({ hasBoat, template }: { hasBoat: boolean; template: string }) {
   return (
     <View style={StyleSheet.absoluteFill}>
-      <LinearGradient colors={[colors.skyTop, colors.skyBottom]} style={styles.sky} />
+      <LinearGradient colors={['#0084d8', '#10aee8', '#7de3ff']} style={styles.sky} />
       <View style={[styles.sun, template === 'maintenance_yard' && styles.sunDim]} />
+      <View style={[styles.cloud, styles.cloudOne]}><View style={styles.cloudPuffA} /><View style={styles.cloudPuffB} /><View style={styles.cloudPuffC} /></View>
+      <View style={[styles.cloud, styles.cloudTwo]}><View style={styles.cloudPuffA} /><View style={styles.cloudPuffB} /><View style={styles.cloudPuffC} /></View>
+      <Text style={styles.gullOne}>⌁</Text>
+      <Text style={styles.gullTwo}>⌁</Text>
       <View style={styles.coastBack} />
       <View style={styles.coastFront} />
-      <LinearGradient colors={[colors.sea, colors.seaDeep]} style={styles.water} />
+      <View style={styles.harborTown}>
+        {Array.from({ length: 9 }).map((_, index) => <View key={index} style={[styles.house, { left: index * 36, top: index % 3 * 13 }]} />)}
+      </View>
+      <LinearGradient colors={['#18c4dc', '#03a7cb', '#087a96']} style={styles.water} />
+      <View style={styles.waterShineA} />
+      <View style={styles.waterShineB} />
+      <View style={styles.waterShineC} />
       <View style={styles.waveOne} />
       <View style={styles.waveTwo} />
       {hasBoat && (
         <View style={styles.boat}>
+          <View style={styles.mast} />
+          <View style={styles.riggingLeft} />
+          <View style={styles.riggingRight} />
           <View style={styles.sail} />
           <View style={styles.sailSmall} />
+          <View style={styles.cabin} />
           <View style={styles.hull} />
         </View>
       )}
@@ -187,53 +227,101 @@ function Scene({ hasBoat, template }: { hasBoat: boolean; template: string }) {
   )
 }
 
+function weatherGlyph(key: string) {
+  if (key.includes('wind')) return '≋'
+  if (key.includes('wave')) return '≋'
+  if (key.includes('rain')) return '☂'
+  return '☼'
+}
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.skyBottom },
+  screen: { flex: 1, backgroundColor: '#0096d8' },
   safe: { flex: 1 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  sky: { position: 'absolute', top: 0, left: 0, right: 0, height: '58%' },
-  sun: { position: 'absolute', top: 86, right: 34, width: 64, height: 64, borderRadius: 32, backgroundColor: '#ffe58a', opacity: 0.9 },
+  sky: { position: 'absolute', top: 0, left: 0, right: 0, height: '62%' },
+  sun: { position: 'absolute', top: 96, right: 44, width: 76, height: 76, borderRadius: 38, backgroundColor: 'rgba(255,246,173,0.72)' },
   sunDim: { opacity: 0.45 },
-  coastBack: { position: 'absolute', top: '42%', left: -20, width: width * 0.7, height: 84, borderTopRightRadius: 90, backgroundColor: colors.coast },
-  coastFront: { position: 'absolute', top: '48%', right: -20, width: width * 0.72, height: 62, borderTopLeftRadius: 80, backgroundColor: colors.sand },
-  water: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '46%' },
-  waveOne: { position: 'absolute', bottom: '31%', left: 28, width: 140, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.34)' },
-  waveTwo: { position: 'absolute', bottom: '23%', right: 48, width: 180, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.28)' },
-  boat: { position: 'absolute', left: width * 0.31, bottom: '31%', width: width * 0.38, height: 128 },
-  sail: { position: 'absolute', left: 50, bottom: 44, width: 0, height: 0, borderLeftWidth: 0, borderRightWidth: 58, borderBottomWidth: 94, borderRightColor: 'transparent', borderBottomColor: colors.white },
-  sailSmall: { position: 'absolute', left: 16, bottom: 44, width: 0, height: 0, borderLeftWidth: 34, borderRightWidth: 0, borderBottomWidth: 74, borderLeftColor: 'transparent', borderBottomColor: '#e8f7ff' },
-  hull: { position: 'absolute', bottom: 22, left: 6, right: 0, height: 26, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, backgroundColor: '#f97316' },
-  playerHud: { marginHorizontal: 16, marginTop: 10, padding: 12, borderRadius: 18, backgroundColor: colors.panelStrong, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: colors.white, fontWeight: '900', fontSize: 18 },
+  cloud: { position: 'absolute', width: 116, height: 42 },
+  cloudOne: { top: '20%', right: 28 },
+  cloudTwo: { top: '28%', left: 122, transform: [{ scale: 0.72 }] },
+  cloudPuffA: { position: 'absolute', left: 0, bottom: 0, width: 56, height: 28, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.86)' },
+  cloudPuffB: { position: 'absolute', left: 33, bottom: 6, width: 48, height: 36, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.94)' },
+  cloudPuffC: { position: 'absolute', left: 68, bottom: 0, width: 48, height: 25, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.86)' },
+  gullOne: { position: 'absolute', top: '27%', left: '29%', color: colors.white, fontSize: 34, fontWeight: '900', transform: [{ rotate: '-18deg' }] },
+  gullTwo: { position: 'absolute', top: '33%', right: '34%', color: 'rgba(255,255,255,0.86)', fontSize: 22, fontWeight: '900', transform: [{ rotate: '12deg' }] },
+  coastBack: { position: 'absolute', top: '39%', left: -42, width: width * 0.82, height: 118, borderTopRightRadius: 160, backgroundColor: '#2f8e54', transform: [{ rotate: '-4deg' }] },
+  coastFront: { position: 'absolute', top: '44%', left: -30, width: width * 0.92, height: 96, borderTopRightRadius: 140, backgroundColor: '#87b76b', transform: [{ rotate: '-3deg' }] },
+  harborTown: { position: 'absolute', top: '43%', left: 0, width: width, height: 90 },
+  house: { position: 'absolute', width: 28, height: 24, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.92)', borderTopWidth: 6, borderTopColor: '#f97316' },
+  water: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '50%' },
+  waterShineA: { position: 'absolute', bottom: '35%', left: -30, width: width * 0.95, height: 70, borderRadius: 35, borderWidth: 2, borderColor: 'rgba(255,255,255,0.18)', transform: [{ rotate: '-8deg' }] },
+  waterShineB: { position: 'absolute', bottom: '26%', right: -60, width: width * 1.05, height: 86, borderRadius: 43, borderWidth: 2, borderColor: 'rgba(255,255,255,0.14)', transform: [{ rotate: '8deg' }] },
+  waterShineC: { position: 'absolute', bottom: '18%', left: -80, width: width * 1.2, height: 92, borderRadius: 46, borderWidth: 2, borderColor: 'rgba(255,255,255,0.12)', transform: [{ rotate: '-5deg' }] },
+  waveOne: { position: 'absolute', bottom: '31%', left: 28, width: 154, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.34)' },
+  waveTwo: { position: 'absolute', bottom: '23%', right: 48, width: 190, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.28)' },
+  boat: { position: 'absolute', left: width * 0.25, bottom: '34%', width: width * 0.5, height: 238 },
+  mast: { position: 'absolute', left: '50%', bottom: 48, width: 2, height: 205, backgroundColor: 'rgba(255,255,255,0.96)' },
+  riggingLeft: { position: 'absolute', left: '29%', bottom: 48, width: 1, height: 182, backgroundColor: 'rgba(255,255,255,0.78)', transform: [{ rotate: '10deg' }] },
+  riggingRight: { position: 'absolute', right: '28%', bottom: 48, width: 1, height: 188, backgroundColor: 'rgba(255,255,255,0.78)', transform: [{ rotate: '-10deg' }] },
+  sail: { position: 'absolute', left: '50%', bottom: 66, width: 0, height: 0, borderLeftWidth: 0, borderRightWidth: 58, borderBottomWidth: 112, borderRightColor: 'transparent', borderBottomColor: 'rgba(255,255,255,0.92)' },
+  sailSmall: { position: 'absolute', left: '24%', bottom: 66, width: 0, height: 0, borderLeftWidth: 48, borderRightWidth: 0, borderBottomWidth: 94, borderLeftColor: 'transparent', borderBottomColor: 'rgba(232,247,255,0.94)' },
+  cabin: { position: 'absolute', left: '34%', right: '24%', bottom: 42, height: 22, borderTopLeftRadius: 12, borderTopRightRadius: 12, backgroundColor: 'rgba(255,255,255,0.94)' },
+  hull: { position: 'absolute', bottom: 26, left: '18%', right: '11%', height: 30, borderBottomLeftRadius: 34, borderBottomRightRadius: 34, backgroundColor: 'rgba(255,255,255,0.96)', borderBottomWidth: 4, borderBottomColor: '#0f5471' },
+  playerHud: { marginHorizontal: 18, marginTop: 8, minHeight: 76, paddingLeft: 74, paddingRight: 16, paddingVertical: 11, borderRadius: 24, backgroundColor: 'rgba(235,248,255,0.88)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.82)', flexDirection: 'row', alignItems: 'center', shadowColor: '#075985', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
+  avatarWrap: { position: 'absolute', left: -7, top: -9, width: 86, height: 86 },
+  avatar: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#bfe9ff', borderWidth: 4, borderColor: colors.white, alignItems: 'center', justifyContent: 'center', shadowColor: '#075985', shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
+  avatarText: { color: colors.ink, fontWeight: '900', fontSize: 30 },
+  rankBadge: { position: 'absolute', right: 3, bottom: 3, width: 34, height: 34, borderRadius: 10, backgroundColor: colors.ink, borderWidth: 3, borderColor: '#fbbf24', alignItems: 'center', justifyContent: 'center' },
+  rankText: { color: '#fbbf24', fontSize: 19, fontWeight: '900' },
   playerMain: { flex: 1 },
-  playerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  playerName: { color: colors.ink, fontSize: 16, fontWeight: '900' },
-  level: { color: colors.accent, fontSize: 12, fontWeight: '900' },
-  xpTrack: { height: 7, borderRadius: 4, backgroundColor: 'rgba(0,119,182,0.15)', overflow: 'hidden', marginTop: 5 },
-  xpFill: { height: '100%', backgroundColor: colors.orange, borderRadius: 4 },
-  title: { color: colors.muted, fontSize: 11, marginTop: 4, fontWeight: '700' },
+  playerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 28 },
+  playerName: { color: '#071735', fontSize: 22, fontWeight: '900' },
+  level: { color: '#071735', fontSize: 13, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(18,48,71,0.18)', overflow: 'hidden' },
+  titleWrap: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 7, maxWidth: width * 0.36 },
+  titleIcon: { color: '#0891b2', fontSize: 20, fontWeight: '900' },
+  title: { color: '#0786a6', fontSize: 14, fontWeight: '900' },
+  xpText: { color: '#071735', fontSize: 14, fontWeight: '900', marginTop: 4 },
+  xpTrack: { height: 7, borderRadius: 4, backgroundColor: 'rgba(14,116,144,0.22)', overflow: 'hidden', marginTop: 8, maxWidth: width * 0.52 },
+  xpFill: { height: '100%', backgroundColor: '#10b8bd', borderRadius: 4 },
   previewToggle: { width: 54, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,119,182,0.1)' },
   previewText: { color: colors.accent, fontWeight: '900', fontSize: 11 },
-  conditionRow: { marginTop: 12, marginHorizontal: 16, flexDirection: 'row', gap: 8 },
-  conditionChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.line },
+  messageButton: { position: 'absolute', right: 22, top: 18, width: 54, height: 54, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.35)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.86)', alignItems: 'center', justifyContent: 'center' },
+  messageIcon: { color: colors.white, fontSize: 30, fontWeight: '900', transform: [{ rotate: '90deg' }] },
+  messageDot: { position: 'absolute', right: -4, top: -4, width: 16, height: 16, borderRadius: 8, backgroundColor: '#ff4b3e', borderWidth: 2, borderColor: colors.white },
+  conditionRow: { position: 'absolute', left: 72, right: 72, bottom: 197, flexDirection: 'row', justifyContent: 'center', gap: 14 },
+  conditionChip: { minWidth: 102, height: 37, paddingHorizontal: 12, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.88)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.92)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   conditionLabel: { color: colors.muted, fontSize: 10, fontWeight: '800' },
-  conditionValue: { color: colors.ink, fontSize: 13, fontWeight: '900' },
-  boatNameWrap: { position: 'absolute', left: 0, right: 0, top: '45%', alignItems: 'center' },
-  boatName: { alignItems: 'center', paddingHorizontal: 18, paddingVertical: 8, borderRadius: 18, backgroundColor: colors.panelStrong, borderWidth: 1, borderColor: colors.line },
-  boatNameText: { color: colors.ink, fontSize: 18, fontWeight: '900' },
+  conditionGlyph: { color: '#0786a6', fontSize: 22, fontWeight: '900' },
+  conditionValue: { color: '#071735', fontSize: 13, fontWeight: '900' },
+  boatNameWrap: { position: 'absolute', left: 0, right: 0, bottom: 244, alignItems: 'center' },
+  boatName: { alignItems: 'center', paddingHorizontal: 20, paddingVertical: 7, borderRadius: 18, backgroundColor: 'rgba(15,148,170,0.76)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)' },
+  boatNameText: { color: colors.white, fontSize: 18, fontWeight: '900' },
   boatNameSub: { color: colors.muted, fontSize: 10, fontWeight: '700', marginTop: 2 },
-  crewStrip: { position: 'absolute', left: 16, right: 16, bottom: 118, padding: 12, borderRadius: 18, backgroundColor: colors.panelStrong, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  crewLabel: { color: colors.muted, fontSize: 10, fontWeight: '800' },
-  crewValue: { color: colors.ink, fontSize: 12, fontWeight: '900', textTransform: 'capitalize' },
-  crewDivider: { width: 1, height: 20, backgroundColor: colors.line },
-  alert: { position: 'absolute', left: 20, right: 20, bottom: 180, padding: 12, borderRadius: 16, backgroundColor: 'rgba(255,251,235,0.94)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.35)' },
-  alertTitle: { color: colors.orange, fontSize: 12, fontWeight: '900' },
-  alertText: { color: colors.ink, fontSize: 13, fontWeight: '800', marginTop: 2 },
-  shortcutsLeft: { position: 'absolute', left: 14, top: '33%', gap: 10 },
-  shortcutsRight: { position: 'absolute', right: 14, top: '33%', gap: 10 },
-  shortcut: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.panelStrong, borderWidth: 1, borderColor: colors.line },
+  crewStrip: { position: 'absolute', left: 18, right: 18, bottom: 112, minHeight: 72, paddingHorizontal: 10, borderRadius: 20, backgroundColor: 'rgba(240,250,255,0.92)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.86)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#075985', shadowOpacity: 0.16, shadowRadius: 14, shadowOffset: { width: 0, height: 8 } },
+  crewProfile: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
+  crewAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#d9f2ff', borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  crewAvatarAlt: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#cce7ee', borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  crewAvatarText: { color: colors.ink, fontSize: 22, fontWeight: '900' },
+  crewLabel: { color: '#0786a6', fontSize: 12, fontWeight: '900', marginTop: 2 },
+  crewValue: { color: '#071735', fontSize: 12, fontWeight: '900' },
+  crewRole: { fontWeight: '700' },
+  crewDivider: { width: 1, height: 44, backgroundColor: 'rgba(14,116,144,0.18)' },
+  crewAction: { width: 48, alignItems: 'center', justifyContent: 'center' },
+  crewActionIcon: { color: '#071735', fontSize: 24, fontWeight: '900' },
+  crewActionText: { color: '#071735', fontSize: 11, fontWeight: '800', textAlign: 'center' },
+  alert: { position: 'absolute', left: 18, right: 18, bottom: 24 + 76 + 12, minHeight: 62, padding: 10, borderRadius: 18, backgroundColor: 'rgba(244,252,255,0.94)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.86)', flexDirection: 'row', alignItems: 'center', gap: 10, shadowColor: '#075985', shadowOpacity: 0.14, shadowRadius: 12, shadowOffset: { width: 0, height: 7 } },
+  alertIconWrap: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  alertIcon: { color: '#fb6a21', fontSize: 34, fontWeight: '900' },
+  alertMain: { flex: 1 },
+  alertTitle: { color: '#071735', fontSize: 14, fontWeight: '900' },
+  alertText: { color: '#071735', fontSize: 12, fontWeight: '800', marginTop: 3 },
+  reviewButton: { minWidth: 98, height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#008ba5' },
+  reviewText: { color: colors.white, fontSize: 16, fontWeight: '900' },
+  shortcutsLeft: { position: 'absolute', left: 20, top: '22%', gap: 30 },
+  shortcutsRight: { position: 'absolute', right: 20, top: '22%', gap: 30 },
+  shortcut: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.22)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.88)' },
   shortcutText: { color: colors.ink, fontSize: 9, fontWeight: '800', marginTop: 2, maxWidth: 50 },
+  syncWrap: { position: 'absolute', left: 2, right: 2, bottom: 184, opacity: 0.78 },
   emptyActions: { position: 'absolute', left: 24, right: 24, top: '42%', alignItems: 'center' },
   emptyTitle: { color: colors.ink, fontSize: 22, fontWeight: '900', marginBottom: 18 },
   emptyButtons: { flexDirection: 'row', gap: 10 },
@@ -241,7 +329,7 @@ const styles = StyleSheet.create({
   primaryText: { color: colors.white, fontWeight: '900' },
   secondaryBtn: { minWidth: 132, paddingVertical: 13, alignItems: 'center', borderRadius: 14, backgroundColor: colors.panelStrong, borderWidth: 1, borderColor: colors.line },
   secondaryText: { color: colors.accent, fontWeight: '900' },
-  bottomNav: { position: 'absolute', left: 16, right: 16, bottom: 22, height: 70, borderRadius: 26, backgroundColor: colors.panelStrong, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
-  navItem: { width: 72, height: 52, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  navText: { color: colors.ink, fontSize: 10, fontWeight: '900' },
+  bottomNav: { position: 'absolute', left: 18, right: 18, bottom: 18, height: 76, borderRadius: 20, backgroundColor: 'rgba(244,252,255,0.94)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.88)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', shadowColor: '#075985', shadowOpacity: 0.16, shadowRadius: 14, shadowOffset: { width: 0, height: 8 } },
+  navItem: { flex: 1, height: 58, alignItems: 'center', justifyContent: 'center', gap: 3, borderRightWidth: 1, borderRightColor: 'rgba(14,116,144,0.16)' },
+  navText: { color: colors.ink, fontSize: 13, fontWeight: '800' },
 })
