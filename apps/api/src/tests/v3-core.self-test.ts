@@ -55,6 +55,14 @@ async function main() {
     assert.equal(emptyHud.currentVessel, null)
     assert.deepEqual(emptyHud.shortcuts, [])
 
+    console.log('v3-core selftest: toolbox')
+    const unitConversion = await get<Json>(`${baseUrl}/toolbox/units?value=1&from=nm&to=km`)
+    assert.equal(Math.round(unitConversion.result * 1000), 1852)
+    const currencyConversion = await get<Json>(`${baseUrl}/toolbox/currency?amount=10&from=USD&to=EUR`)
+    assert.ok(currencyConversion.result > 0)
+    const regionInfo = await get<Json>(`${baseUrl}/toolbox/region?code=US`)
+    assert.equal(regionInfo.vhfEmergency, 'VHF 16')
+
     console.log('v3-core selftest: create vessel')
     const vesselModel = await post<Json>(`${baseUrl}/vessels/models`, {
       brand: `Selftest Brand ${suffix}`,

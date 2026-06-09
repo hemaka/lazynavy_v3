@@ -11,10 +11,11 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { PlacesModule } from './modules/places/places.module'
 import { RewardsModule } from './modules/rewards/rewards.module'
 import { SuppliesModule } from './modules/supplies/supplies.module'
+import { ToolboxModule } from './modules/toolbox/toolbox.module'
 import { VesselsModule } from './modules/vessels/vessels.module'
 import { VoyagesModule } from './modules/voyages/voyages.module'
 
 @Module({
-  imports: [PrismaModule, HealthModule, IdentityModule, VesselsModule, VoyagesModule, RewardsModule, LogsModule, PlacesModule, SuppliesModule, EquipmentModule, ManualsModule, MessagingModule, NotificationsModule, HomeModule],
+  imports: [PrismaModule, HealthModule, IdentityModule, VesselsModule, VoyagesModule, RewardsModule, LogsModule, PlacesModule, SuppliesModule, EquipmentModule, ManualsModule, MessagingModule, NotificationsModule, ToolboxModule, HomeModule],
 })
 export class AppModule {}
