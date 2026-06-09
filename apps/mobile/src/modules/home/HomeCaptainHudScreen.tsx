@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   rankText: { color: '#fbbf24', fontSize: 16, fontWeight: '900' },
   playerMain: { flex: 1 },
   playerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 24 },
-  playerName: { color: '#071735', fontSize: 18, fontWeight: '900', maxWidth: width * 0.22 },
+  playerName: { color: '#071735', fontSize: 16, fontWeight: '900', maxWidth: width * 0.22 },
   level: { color: '#071735', fontSize: 11, fontWeight: '900', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, borderWidth: 1, borderColor: 'rgba(18,48,71,0.18)', overflow: 'hidden' },
   xpText: { color: '#071735', fontSize: 12, fontWeight: '900', marginTop: 3 },
   xpTrack: { height: 4, borderRadius: 2, backgroundColor: 'rgba(14,116,144,0.22)', overflow: 'hidden', marginTop: 6, maxWidth: width * 0.44 },
