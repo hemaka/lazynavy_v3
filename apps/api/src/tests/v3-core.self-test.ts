@@ -34,6 +34,7 @@ async function main() {
   const createdManualIds: string[] = []
   const createdChatThreadIds: string[] = []
   const createdChatMessageIds: string[] = []
+  const createdSyncMutationIds: string[] = []
   let app: INestApplication | null = null
 
   try {
@@ -212,6 +213,28 @@ async function main() {
     })
     assert.equal(duplicateGrant.id, voyageReward.id)
 
+    console.log('v3-core selftest: sync')
+    const syncBootstrap = await get<Json>(`${baseUrl}/sync/bootstrap?userId=${captain.id}`)
+    assert.ok(syncBootstrap.vessels.some((item: Json) => item.id === vessel.id))
+    const syncChanges = await get<Json>(`${baseUrl}/sync/changes?since=1970-01-01T00:00:00.000Z&userId=${captain.id}`)
+    assert.ok(Array.isArray(syncChanges.supplies))
+    const syncMutation = await post<Json>(`${baseUrl}/sync/mutations?userId=${captain.id}`, {
+      vesselId: vessel.id,
+      clientMutationId: `selftest-${suffix}`,
+      entityType: 'log',
+      operation: 'create',
+      payload: { title: 'Offline log draft' },
+    })
+    createdSyncMutationIds.push(syncMutation.id)
+    const duplicateSyncMutation = await post<Json>(`${baseUrl}/sync/mutations?userId=${captain.id}`, {
+      vesselId: vessel.id,
+      clientMutationId: `selftest-${suffix}`,
+      entityType: 'log',
+      operation: 'create',
+      payload: { title: 'Offline log draft' },
+    })
+    assert.equal(duplicateSyncMutation.id, syncMutation.id)
+
     console.log('v3-core selftest: logs, supplies, poi, discovery')
     const log = await post<Json>(`${baseUrl}/logs?userId=${captain.id}`, {
       vesselId: vessel.id,
@@ -387,6 +410,7 @@ async function main() {
       await prisma.logEntry.deleteMany({ where: { id: { in: createdLogIds } } })
       await prisma.supplyItem.deleteMany({ where: { id: { in: createdSupplyIds } } })
       await prisma.notification.deleteMany({ where: { userId: { in: createdUserIds } } })
+      await prisma.syncMutation.deleteMany({ where: { id: { in: createdSyncMutationIds } } })
       await prisma.manualDocument.deleteMany({ where: { id: { in: createdManualIds } } })
       await prisma.maintenanceRecord.deleteMany({ where: { id: { in: createdMaintenanceIds } } })
       await prisma.equipment.deleteMany({ where: { OR: [{ id: { in: createdEquipmentIds } }, { vesselId: { in: createdVesselIds } }] } })

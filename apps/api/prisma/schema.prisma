@@ -538,6 +538,23 @@ model ChatMessage {
   @@index([threadId, createdAt])
 }
 
+model SyncMutation {
+  id        String   @id @default(uuid())
+  userId    String
+  vesselId  String?
+  clientMutationId String @unique
+  entityType String
+  operation  String
+  payload    Json
+  status     String   @default("received")
+  error      String?
+  createdAt  DateTime @default(now())
+  appliedAt  DateTime?
+
+  @@index([userId, createdAt])
+  @@index([vesselId, createdAt])
+}
+
 model RewardRule {
   id                   String   @id @default(uuid())
   key                  String   @unique

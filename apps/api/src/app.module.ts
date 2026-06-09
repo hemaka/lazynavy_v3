@@ -11,12 +11,13 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { PlacesModule } from './modules/places/places.module'
 import { RewardsModule } from './modules/rewards/rewards.module'
 import { SuppliesModule } from './modules/supplies/supplies.module'
+import { SyncModule } from './modules/sync/sync.module'
 import { ToolboxModule } from './modules/toolbox/toolbox.module'
 import { VesselsModule } from './modules/vessels/vessels.module'
 import { VoyagesModule } from './modules/voyages/voyages.module'
 import { WeatherModule } from './modules/weather/weather.module'
 
 @Module({
-  imports: [PrismaModule, HealthModule, IdentityModule, VesselsModule, VoyagesModule, RewardsModule, LogsModule, PlacesModule, SuppliesModule, EquipmentModule, ManualsModule, MessagingModule, NotificationsModule, ToolboxModule, WeatherModule, HomeModule],
+  imports: [PrismaModule, HealthModule, IdentityModule, VesselsModule, VoyagesModule, RewardsModule, LogsModule, PlacesModule, SuppliesModule, EquipmentModule, ManualsModule, MessagingModule, NotificationsModule, SyncModule, ToolboxModule, WeatherModule, HomeModule],
 })
 export class AppModule {}
