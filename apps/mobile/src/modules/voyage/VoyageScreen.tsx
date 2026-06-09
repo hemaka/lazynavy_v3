@@ -7,11 +7,14 @@ import { colors } from '../../theme/tokens'
 import {
   completeVoyage,
   completeVoyageChecklistItem,
+  createVoyageWaiver,
   createVoyagePlan,
+  listVoyageDocuments,
   listVoyageChecklist,
   listVoyages,
   startVoyage,
   type VoyageChecklistItem,
+  type VoyageDocument,
   type VoyageRecord,
 } from './api'
 
@@ -19,6 +22,7 @@ export function VoyageScreen() {
   const [vesselId, setVesselId] = useState<string | null>(null)
   const [voyages, setVoyages] = useState<VoyageRecord[]>([])
   const [checklist, setChecklist] = useState<VoyageChecklistItem[]>([])
+  const [documents, setDocuments] = useState<VoyageDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +38,7 @@ export function VoyageScreen() {
       setVesselId(hud.currentVessel?.id ?? null)
       setVoyages(list)
       setChecklist(nextActive ? await listVoyageChecklist(nextActive.id) : [])
+      setDocuments(nextActive ? await listVoyageDocuments(nextActive.id) : [])
     } catch (err: any) {
       setError(err?.message ?? 'Failed to load voyage')
     } finally {
@@ -79,6 +84,20 @@ export function VoyageScreen() {
     }
   }
 
+  async function addWaiver() {
+    if (!active) return
+    setBusy(true)
+    setError(null)
+    try {
+      await createVoyageWaiver(active.id)
+      await load()
+    } catch (err: any) {
+      setError(err?.message ?? 'Document update failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <LinearGradient colors={[colors.skyBottom, '#ffffff']} style={styles.screen}>
       <SafeAreaView style={styles.safe}>
@@ -101,6 +120,16 @@ export function VoyageScreen() {
                 <Text style={styles.name}>{active.name}</Text>
                 <Text style={styles.route}>{active.departureName ?? 'Departure'} → {active.destinationName ?? 'Destination'}</Text>
                 <Text style={styles.meta}>{active.needsConfirmation ? 'Needs confirmation' : 'Ready'} · {active.participants?.length ?? 1} participant(s)</Text>
+                <View style={styles.checklist}>
+                  <View style={styles.checkRow}>
+                    <View style={styles.checkText}>
+                      <Text style={styles.sectionTitle}>Voyage Documents</Text>
+                      <Text style={styles.rowStatus}>{documents.length} stored</Text>
+                    </View>
+                    <Pressable disabled={busy} style={styles.checkButton} onPress={addWaiver}><Text style={styles.secondaryText}>Add</Text></Pressable>
+                  </View>
+                  {documents.map((doc) => <Text key={doc.id} style={styles.rowTitle}>{doc.title} · {doc.type}</Text>)}
+                </View>
                 {active.status === 'planned' && checklist.length > 0 && (
                   <View style={styles.checklist}>
                     <Text style={styles.sectionTitle}>Pre-voyage Checks</Text>

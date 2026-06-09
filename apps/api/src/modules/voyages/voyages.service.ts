@@ -15,6 +15,14 @@ export interface CreateVoyageInput {
   participantUserIds?: string[]
 }
 
+export interface CreateVoyageDocumentInput {
+  title: string
+  type?: string
+  contentText?: string
+  mediaUrl?: string
+  metadata?: unknown
+}
+
 const DEFAULT_PRE_VOYAGE_CHECKS = [
   { title: 'Check fuel and battery', sortOrder: 10 },
   { title: 'Check safety gear', sortOrder: 20 },
@@ -149,6 +157,32 @@ export class VoyagesService {
     })
     await this.addAudit(voyageId, userId, 'checklist.completed', { itemId })
     return updated
+  }
+
+  async listDocuments(userId: string, voyageId: string) {
+    await this.ensureVoyageAccess(userId, voyageId)
+    return this.prisma.manualDocument.findMany({
+      where: { voyageId, deletedAt: null },
+      orderBy: { updatedAt: 'desc' },
+    })
+  }
+
+  async createDocument(userId: string, voyageId: string, input: CreateVoyageDocumentInput) {
+    const voyage = await this.ensureVoyageAccess(userId, voyageId)
+    if (!input.title?.trim()) throw new BadRequestException('Document title is required')
+    return this.prisma.manualDocument.create({
+      data: {
+        ownerId: userId,
+        vesselId: voyage.vesselId,
+        voyageId,
+        title: input.title.trim(),
+        type: input.type ?? 'waiver',
+        contentText: input.contentText,
+        mediaUrl: input.mediaUrl,
+        metadata: input.metadata as any,
+        offlinePriority: 'high',
+      },
+    })
   }
 
   async complete(userId: string, voyageId: string) {

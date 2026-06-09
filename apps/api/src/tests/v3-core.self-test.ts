@@ -153,6 +153,14 @@ async function main() {
     assert.equal(hudWithVoyage.currentVessel.id, vessel.id)
     assert.equal(hudWithVoyage.activeVoyage.id, voyage.id)
     assert.equal(hudWithVoyage.activeVoyage.needsConfirmation, true)
+    const waiver = await post<Json>(`${baseUrl}/voyages/${voyage.id}/documents?userId=${captain.id}`, {
+      title: `Selftest Waiver ${suffix}`,
+      type: 'waiver',
+      contentText: 'Crew liability waiver accepted for this voyage.',
+    })
+    createdManualIds.push(waiver.id)
+    const voyageDocuments = await get<Json[]>(`${baseUrl}/voyages/${voyage.id}/documents?userId=${crew.id}`)
+    assert.ok(voyageDocuments.some((item) => item.id === waiver.id))
 
     console.log('v3-core selftest: complete voyage')
     await patch<Json>(`${baseUrl}/voyages/${voyage.id}/confirm?userId=${crew.id}`, {})

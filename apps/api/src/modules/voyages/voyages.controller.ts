@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common'
 import { IdentityService } from '../identity/identity.service'
-import { type CreateVoyageInput, VoyagesService } from './voyages.service'
+import { type CreateVoyageDocumentInput, type CreateVoyageInput, VoyagesService } from './voyages.service'
 
 @Controller('voyages')
 export class VoyagesController {
@@ -49,6 +49,20 @@ export class VoyagesController {
     const user = userId ? await this.identity.getUser(userId) : await this.identity.getOrCreateDevUser()
     if (!user) throw new Error('User not found')
     return this.voyages.completeChecklistItem(user.id, id, itemId)
+  }
+
+  @Get(':id/documents')
+  async documents(@Param('id') id: string, @Query('userId') userId?: string) {
+    const user = userId ? await this.identity.getUser(userId) : await this.identity.getOrCreateDevUser()
+    if (!user) return []
+    return this.voyages.listDocuments(user.id, id)
+  }
+
+  @Post(':id/documents')
+  async createDocument(@Param('id') id: string, @Body() body: CreateVoyageDocumentInput, @Query('userId') userId?: string) {
+    const user = userId ? await this.identity.getUser(userId) : await this.identity.getOrCreateDevUser()
+    if (!user) throw new Error('User not found')
+    return this.voyages.createDocument(user.id, id, body)
   }
 
   @Patch(':id/complete')

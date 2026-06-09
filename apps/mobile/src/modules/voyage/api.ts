@@ -20,6 +20,12 @@ export interface VoyageChecklistItem {
   completedAt?: string | null
 }
 
+export interface VoyageDocument {
+  id: string
+  title: string
+  type: string
+}
+
 export function listVoyages() {
   return getJson<VoyageRecord[]>('/voyages')
 }
@@ -44,6 +50,18 @@ export function listVoyageChecklist(voyageId: string) {
 
 export function completeVoyageChecklistItem(voyageId: string, itemId: string) {
   return patchJson<VoyageChecklistItem>(`/voyages/${voyageId}/checklist/${itemId}/complete`, {})
+}
+
+export function listVoyageDocuments(voyageId: string) {
+  return getJson<VoyageDocument[]>(`/voyages/${voyageId}/documents`)
+}
+
+export function createVoyageWaiver(voyageId: string) {
+  return postJson<VoyageDocument>(`/voyages/${voyageId}/documents`, {
+    title: 'Crew Waiver',
+    type: 'waiver',
+    contentText: 'Voyage waiver stored for offline access.',
+  })
 }
 
 export function completeVoyage(voyageId: string) {
