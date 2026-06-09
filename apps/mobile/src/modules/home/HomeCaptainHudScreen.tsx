@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   avatarWrap: { position: 'absolute', left: -6, top: -4, width: 76, height: 76 },
   avatar: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#bfe9ff', borderWidth: 4, borderColor: colors.white, alignItems: 'center', justifyContent: 'center', shadowColor: '#075985', shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
   avatarText: { color: colors.ink, fontWeight: '900', fontSize: 26 },
-  rankBadge: { position: 'absolute', right: 4, bottom: 4, width: 30, height: 30, borderRadius: 9, backgroundColor: colors.ink, borderWidth: 3, borderColor: '#fbbf24', alignItems: 'center', justifyContent: 'center' },
+  rankBadge: { position: 'absolute', left: 4, bottom: 4, width: 30, height: 30, borderRadius: 9, backgroundColor: colors.ink, borderWidth: 3, borderColor: '#fbbf24', alignItems: 'center', justifyContent: 'center' },
   rankText: { color: '#fbbf24', fontSize: 16, fontWeight: '900' },
   playerMain: { flex: 1 },
   playerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 24 },
