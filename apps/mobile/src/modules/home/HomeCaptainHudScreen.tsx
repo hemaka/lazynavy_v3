@@ -81,9 +81,9 @@ export function HomeCaptainHudScreen() {
             </View>
             <View style={styles.playerMain}>
               <View style={styles.playerRow}>
-                <Text style={styles.playerName}>{hud.user.nickname}</Text>
+                <Text numberOfLines={1} style={styles.playerName}>{hud.user.nickname}</Text>
                 <Text style={styles.level}>Lv. {hud.user.level}</Text>
-                <View style={styles.titleWrap}><Text style={styles.titleIcon}>✧</Text><Text style={styles.title}>{hud.user.title}</Text></View>
+                <View style={styles.titleWrap}><Text style={styles.titleIcon}>✧</Text><Text numberOfLines={1} style={styles.title}>{hud.user.title}</Text></View>
               </View>
               <Text style={styles.xpText}>{hud.user.xp.toLocaleString()} / {hud.user.nextLevelXp.toLocaleString()} XP</Text>
               <View style={styles.xpTrack}><View style={[styles.xpFill, { width: `${xpPercent * 100}%` }]} /></View>
@@ -267,22 +267,22 @@ const styles = StyleSheet.create({
   sailSmall: { position: 'absolute', left: '24%', bottom: 66, width: 0, height: 0, borderLeftWidth: 48, borderRightWidth: 0, borderBottomWidth: 94, borderLeftColor: 'transparent', borderBottomColor: 'rgba(232,247,255,0.94)' },
   cabin: { position: 'absolute', left: '34%', right: '24%', bottom: 42, height: 22, borderTopLeftRadius: 12, borderTopRightRadius: 12, backgroundColor: 'rgba(255,255,255,0.94)' },
   hull: { position: 'absolute', bottom: 26, left: '18%', right: '11%', height: 30, borderBottomLeftRadius: 34, borderBottomRightRadius: 34, backgroundColor: 'rgba(255,255,255,0.96)', borderBottomWidth: 4, borderBottomColor: '#0f5471' },
-  playerHud: { marginHorizontal: 18, marginTop: 8, minHeight: 76, paddingLeft: 74, paddingRight: 16, paddingVertical: 11, borderRadius: 24, backgroundColor: 'rgba(235,248,255,0.88)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.82)', flexDirection: 'row', alignItems: 'center', shadowColor: '#075985', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
-  avatarWrap: { position: 'absolute', left: -7, top: -9, width: 86, height: 86 },
-  avatar: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#bfe9ff', borderWidth: 4, borderColor: colors.white, alignItems: 'center', justifyContent: 'center', shadowColor: '#075985', shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
-  avatarText: { color: colors.ink, fontWeight: '900', fontSize: 30 },
-  rankBadge: { position: 'absolute', right: 3, bottom: 3, width: 34, height: 34, borderRadius: 10, backgroundColor: colors.ink, borderWidth: 3, borderColor: '#fbbf24', alignItems: 'center', justifyContent: 'center' },
-  rankText: { color: '#fbbf24', fontSize: 19, fontWeight: '900' },
+  playerHud: { marginLeft: 18, marginRight: 92, marginTop: 8, minHeight: 68, paddingLeft: 66, paddingRight: 12, paddingVertical: 9, borderRadius: 22, backgroundColor: 'rgba(235,248,255,0.88)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.82)', flexDirection: 'row', alignItems: 'center', shadowColor: '#075985', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
+  avatarWrap: { position: 'absolute', left: -6, top: -7, width: 76, height: 76 },
+  avatar: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#bfe9ff', borderWidth: 4, borderColor: colors.white, alignItems: 'center', justifyContent: 'center', shadowColor: '#075985', shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
+  avatarText: { color: colors.ink, fontWeight: '900', fontSize: 26 },
+  rankBadge: { position: 'absolute', right: 4, bottom: 4, width: 30, height: 30, borderRadius: 9, backgroundColor: colors.ink, borderWidth: 3, borderColor: '#fbbf24', alignItems: 'center', justifyContent: 'center' },
+  rankText: { color: '#fbbf24', fontSize: 16, fontWeight: '900' },
   playerMain: { flex: 1 },
-  playerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 28 },
-  playerName: { color: '#071735', fontSize: 22, fontWeight: '900' },
-  level: { color: '#071735', fontSize: 13, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(18,48,71,0.18)', overflow: 'hidden' },
-  titleWrap: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 7, maxWidth: width * 0.36 },
-  titleIcon: { color: '#0891b2', fontSize: 20, fontWeight: '900' },
-  title: { color: '#0786a6', fontSize: 14, fontWeight: '900' },
-  xpText: { color: '#071735', fontSize: 14, fontWeight: '900', marginTop: 4 },
-  xpTrack: { height: 7, borderRadius: 4, backgroundColor: 'rgba(14,116,144,0.22)', overflow: 'hidden', marginTop: 8, maxWidth: width * 0.52 },
-  xpFill: { height: '100%', backgroundColor: '#10b8bd', borderRadius: 4 },
+  playerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 24 },
+  playerName: { color: '#071735', fontSize: 18, fontWeight: '900', maxWidth: width * 0.22 },
+  level: { color: '#071735', fontSize: 11, fontWeight: '900', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, borderWidth: 1, borderColor: 'rgba(18,48,71,0.18)', overflow: 'hidden' },
+  titleWrap: { flex: 1, minWidth: 0, marginLeft: 4, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  titleIcon: { color: '#0891b2', fontSize: 16, fontWeight: '900' },
+  title: { flex: 1, color: '#0786a6', fontSize: 12, fontWeight: '900' },
+  xpText: { color: '#071735', fontSize: 12, fontWeight: '900', marginTop: 3 },
+  xpTrack: { height: 4, borderRadius: 2, backgroundColor: 'rgba(14,116,144,0.22)', overflow: 'hidden', marginTop: 6, maxWidth: width * 0.44 },
+  xpFill: { height: '100%', backgroundColor: '#10b8bd', borderRadius: 2 },
   previewToggle: { width: 54, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,119,182,0.1)' },
   previewText: { color: colors.accent, fontWeight: '900', fontSize: 11 },
   messageButton: { position: 'absolute', right: 22, top: 18, width: 54, height: 54, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.35)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.86)', alignItems: 'center', justifyContent: 'center' },
