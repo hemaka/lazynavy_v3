@@ -6,6 +6,7 @@ const DEFAULT_REWARD_RULES = [
   { key: 'voyage.completed', sourceCategory: 'captain', xpAmount: 80, mileageAmount: 20, mileageRequiresReview: true },
   { key: 'log.created', sourceCategory: 'logger', xpAmount: 12, mileageAmount: 0, mileageRequiresReview: false, dailyCap: 60 },
   { key: 'discovery.unlocked', sourceCategory: 'explorer', xpAmount: 45, mileageAmount: 10, mileageRequiresReview: true },
+  { key: 'boat.setup.completed', sourceCategory: 'captain', xpAmount: 40, mileageAmount: 0, mileageRequiresReview: false },
   { key: 'maintenance.completed', sourceCategory: 'engineer', xpAmount: 30, mileageAmount: 0, mileageRequiresReview: false },
 ] as const
 

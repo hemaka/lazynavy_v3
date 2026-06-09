@@ -36,6 +36,9 @@ model Vessel {
   name          String
   type          String?
   homePort      String?
+  registeredName String?
+  buildYear     Int?
+  acquisitionYear Int?
   title         String   @default("First Wake")
   level         Int      @default(1)
   xp            Int      @default(0)
@@ -44,12 +47,15 @@ model Vessel {
   availableMileagePoints Int @default(0)
   pendingMileagePoints   Int @default(0)
   sceneTemplate String   @default("open_sea")
+  setupStatus   String   @default("started")
   deletedAt     DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   owner        User               @relation("VesselOwner", fields: [ownerId], references: [id])
   memberships  VesselMembership[]
+  invitations  VesselInvitation[]
+  setupSteps   VesselSetupStep[]
   voyages      Voyage[]
   logEntries   LogEntry[]
   supplies     SupplyItem[]
@@ -72,6 +78,55 @@ model VesselMembership {
 
   @@unique([vesselId, userId])
   @@index([userId])
+}
+
+model VesselRoleTemplate {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  name        String
+  rank        Int      @default(50)
+  permissions Json
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model VesselInvitation {
+  id           String    @id @default(uuid())
+  vesselId     String
+  code         String    @unique
+  role         String    @default("guest")
+  invitedById  String
+  claimedById  String?
+  status       String    @default("active")
+  expiresAt    DateTime?
+  claimedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  vessel Vessel @relation(fields: [vesselId], references: [id])
+
+  @@index([vesselId, status])
+  @@index([invitedById])
+}
+
+model VesselSetupStep {
+  id          String    @id @default(uuid())
+  vesselId    String
+  key         String
+  title       String
+  status      String    @default("open")
+  sortOrder   Int       @default(0)
+  completedById String?
+  completedAt DateTime?
+  skippedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  vessel Vessel @relation(fields: [vesselId], references: [id])
+
+  @@unique([vesselId, key])
+  @@index([vesselId, status])
 }
 
 model Voyage {

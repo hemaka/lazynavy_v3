@@ -26,6 +26,7 @@ async function main() {
   const createdDiscoveryPointIds: string[] = []
   const createdDiscoveryUnlockIds: string[] = []
   const createdSupplyIds: string[] = []
+  const createdInvitationIds: string[] = []
   let app: INestApplication | null = null
 
   try {
@@ -55,6 +56,38 @@ async function main() {
     })
     createdVesselIds.push(vessel.id)
     assert.equal(vessel.memberships[0].role, 'captain')
+    assert.equal(vessel.setupSteps.length, 4)
+
+    const roles = await get<Json[]>(`${baseUrl}/vessels/roles`)
+    assert.ok(roles.some((role) => role.key === 'captain'))
+
+    const updatedVessel = await patch<Json>(`${baseUrl}/vessels/${vessel.id}?userId=${captain.id}`, {
+      registeredName: `LN-${suffix}`,
+      buildYear: 2025,
+      sceneTemplate: 'marina_night',
+    })
+    assert.equal(updatedVessel.registeredName, `LN-${suffix}`)
+    assert.equal(updatedVessel.sceneTemplate, 'marina_night')
+
+    const invite = await post<Json>(`${baseUrl}/vessels/${vessel.id}/invitations?userId=${captain.id}`, { role: 'crew', expiresInDays: 7 })
+    createdInvitationIds.push(invite.id)
+    assert.equal(invite.status, 'active')
+
+    const inviteList = await get<Json[]>(`${baseUrl}/vessels/${vessel.id}/invitations?userId=${captain.id}`)
+    assert.ok(inviteList.some((item) => item.id === invite.id))
+
+    const joined = await post<Json>(`${baseUrl}/vessels/join?userId=${crew.id}`, { code: invite.code })
+    assert.equal(joined.vessel.id, vessel.id)
+    assert.equal(joined.membership.role, 'crew')
+
+    const setupSteps = await get<Json[]>(`${baseUrl}/vessels/${vessel.id}/setup-steps?userId=${captain.id}`)
+    assert.equal(setupSteps.length, 4)
+    await patch<Json>(`${baseUrl}/vessels/${vessel.id}/setup-steps/profile/complete?userId=${captain.id}`, {})
+    await patch<Json>(`${baseUrl}/vessels/${vessel.id}/setup-steps/home_port/complete?userId=${captain.id}`, {})
+    await patch<Json>(`${baseUrl}/vessels/${vessel.id}/setup-steps/supplies/skip?userId=${captain.id}`, {})
+    await patch<Json>(`${baseUrl}/vessels/${vessel.id}/setup-steps/crew/complete?userId=${captain.id}`, {})
+    const afterSetup = await get<Json[]>(`${baseUrl}/rewards/ledger?userId=${captain.id}`)
+    assert.ok(afterSetup.some((item) => item.ruleKey === 'boat.setup.completed' && item.sourceId === vessel.id))
 
     await post<Json>(`${baseUrl}/vessels/${vessel.id}/crew?userId=${captain.id}`, { userId: crew.id, role: 'navigator' })
     await patch<Json>(`${baseUrl}/vessels/${vessel.id}/current?userId=${captain.id}`, {})
@@ -196,6 +229,8 @@ async function main() {
       await prisma.voyageAuditEvent.deleteMany({ where: { voyageId: { in: createdVoyageIds } } })
       await prisma.voyageParticipant.deleteMany({ where: { voyageId: { in: createdVoyageIds } } })
       await prisma.voyage.deleteMany({ where: { id: { in: createdVoyageIds } } })
+      await prisma.vesselInvitation.deleteMany({ where: { id: { in: createdInvitationIds } } })
+      await prisma.vesselSetupStep.deleteMany({ where: { vesselId: { in: createdVesselIds } } })
       await prisma.vesselMembership.deleteMany({ where: { OR: [{ userId: { in: createdUserIds } }, { vesselId: { in: createdVesselIds } }] } })
       await prisma.vessel.deleteMany({ where: { id: { in: createdVesselIds } } })
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } })
