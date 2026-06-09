@@ -77,7 +77,7 @@ export function HomeCaptainHudScreen() {
           <View style={styles.playerHud}>
             <View style={styles.avatarWrap}>
               <View style={styles.avatar}><Text style={styles.avatarText}>{hud.user.nickname.slice(0, 1)}</Text></View>
-              <View style={styles.rankBadge}><Text style={styles.rankText}>⚓</Text></View>
+              <View style={styles.rankBadge}><Text style={styles.rankText}>{hud.user.level}</Text></View>
             </View>
             <View style={styles.playerMain}>
               <View style={styles.playerRow}>
