@@ -59,6 +59,7 @@ model Vessel {
   voyages      Voyage[]
   logEntries   LogEntry[]
   supplies     SupplyItem[]
+  equipment    Equipment[]
   discoveryUnlocks DiscoveryUnlock[]
   rewardLedger RewardLedger[]
 
@@ -306,6 +307,78 @@ model SupplyItem {
   vessel Vessel @relation(fields: [vesselId], references: [id])
 
   @@index([vesselId, category])
+}
+
+model EquipmentTemplate {
+  id          String   @id @default(uuid())
+  category    String   @default("other")
+  brand       String?
+  model       String?
+  name        String
+  defaultMaintenanceDays Int?
+  specsJson   Json?
+  partsJson   Json?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  equipment Equipment[]
+
+  @@index([category, active])
+}
+
+model Equipment {
+  id          String   @id @default(uuid())
+  vesselId    String
+  templateId  String?
+  name        String
+  category    String   @default("other")
+  brand       String?
+  model       String?
+  status      String   @default("pending_confirmation")
+  location    String?
+  installedAt DateTime?
+  maintenanceIntervalDays Int?
+  lastServicedAt DateTime?
+  nextDueAt   DateTime?
+  partsJson   Json?
+  metadata    Json?
+  version     Int      @default(1)
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vessel   Vessel @relation(fields: [vesselId], references: [id])
+  template EquipmentTemplate? @relation(fields: [templateId], references: [id])
+  maintenanceRecords MaintenanceRecord[]
+
+  @@index([vesselId, status])
+  @@index([nextDueAt])
+  @@index([templateId])
+}
+
+model MaintenanceRecord {
+  id          String   @id @default(uuid())
+  vesselId    String
+  equipmentId String?
+  type        String   @default("service")
+  status      String   @default("open")
+  title       String
+  notes       String?
+  performedAt DateTime?
+  dueAt       DateTime?
+  cost        Float?
+  completedById String?
+  sourceMessageId String?
+  sourceActionId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  equipment Equipment? @relation(fields: [equipmentId], references: [id])
+
+  @@index([vesselId, status])
+  @@index([equipmentId, createdAt])
+  @@index([dueAt])
 }
 
 model RewardRule {

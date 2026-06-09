@@ -16,6 +16,7 @@ import {
   type VesselInvitation,
   type VesselSetupStep,
 } from './api'
+import { completeService, createEquipment, listDueEquipment, listEquipment, type EquipmentItem } from './equipmentApi'
 import { adjustSupply, createSupply, listSupplies, type SupplyItem } from './suppliesApi'
 
 const labels: Record<string, string> = {
@@ -36,6 +37,7 @@ export function BoatSectionScreen() {
   const section = typeof params.section === 'string' ? params.section : 'overview'
   if (section === 'overview') return <OverviewScreen />
   if (section === 'supplies') return <SuppliesScreen />
+  if (section === 'equipment') return <EquipmentScreen />
   if (section === 'join') return <JoinScreen />
   const title = labels[section] ?? 'Boat Module'
   return (
@@ -229,6 +231,97 @@ function JoinScreen() {
             <Text style={styles.primaryText}>Join</Text>
           </Pressable>
         </View>
+      </SafeAreaView>
+    </LinearGradient>
+  )
+}
+
+function EquipmentScreen() {
+  const [vesselId, setVesselId] = useState<string | null>(null)
+  const [items, setItems] = useState<EquipmentItem[]>([])
+  const [due, setDue] = useState<EquipmentItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function load() {
+    setLoading(true)
+    setError(null)
+    try {
+      const hud = await getCaptainHud()
+      const id = hud.currentVessel?.id ?? null
+      setVesselId(id)
+      if (id) {
+        const [nextItems, nextDue] = await Promise.all([listEquipment(id), listDueEquipment(id)])
+        setItems(nextItems)
+        setDue(nextDue)
+      } else {
+        setItems([])
+        setDue([])
+      }
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load equipment')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { void load() }, [])
+
+  async function add() {
+    if (!vesselId) return
+    setBusy(true)
+    try {
+      await createEquipment(vesselId)
+      await load()
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to add equipment')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function service(item: EquipmentItem) {
+    setBusy(true)
+    try {
+      await completeService(item.id)
+      await load()
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to record service')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <LinearGradient colors={[colors.skyBottom, '#ffffff']} style={styles.screen}>
+      <SafeAreaView style={styles.safe}>
+        <Header title="Equipment" />
+        {loading ? <ActivityIndicator color={colors.accent} /> : (
+          <ScrollView contentContainerStyle={styles.content}>
+            {error && <Text style={styles.error}>{error}</Text>}
+            <Pressable disabled={!vesselId || busy} style={[styles.primary, (!vesselId || busy) && styles.disabled]} onPress={add}>
+              <Text style={styles.primaryText}>{vesselId ? 'Add Engine' : 'Create Boat First'}</Text>
+            </Pressable>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Due Soon</Text>
+              <Text style={styles.cardMeta}>{due.length ? `${due.length} items need attention` : 'No upcoming service'}</Text>
+            </View>
+            {items.map((item) => (
+              <View key={item.id} style={styles.card}>
+                <View style={styles.cardHead}>
+                  <View>
+                    <Text style={styles.cardTitle}>{item.name}</Text>
+                    <Text style={styles.cardMeta}>{item.category} · {item.location ?? 'No location'}</Text>
+                  </View>
+                  <Text style={styles.badge}>{item.status}</Text>
+                </View>
+                <Text style={styles.cardMeta}>Next due {item.nextDueAt ? new Date(item.nextDueAt).toLocaleDateString() : '-'}</Text>
+                <Pressable disabled={busy} style={styles.secondary} onPress={() => service(item)}><Text style={styles.secondaryText}>Record Service</Text></Pressable>
+              </View>
+            ))}
+          </ScrollView>
+        )}
       </SafeAreaView>
     </LinearGradient>
   )

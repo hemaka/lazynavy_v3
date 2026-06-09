@@ -27,6 +27,9 @@ async function main() {
   const createdDiscoveryUnlockIds: string[] = []
   const createdSupplyIds: string[] = []
   const createdInvitationIds: string[] = []
+  const createdEquipmentTemplateIds: string[] = []
+  const createdEquipmentIds: string[] = []
+  const createdMaintenanceIds: string[] = []
   let app: INestApplication | null = null
 
   try {
@@ -164,6 +167,56 @@ async function main() {
     const adjustedSupply = await patch<Json>(`${baseUrl}/vessels/${vessel.id}/supplies/${supply.id}/adjust?userId=${captain.id}`, { delta: 60 })
     assert.equal(adjustedSupply.quantity, 80)
 
+    console.log('v3-core selftest: equipment and maintenance')
+    const equipmentTemplate = await post<Json>(`${baseUrl}/equipment-templates`, {
+      name: `Selftest Engine Template ${suffix}`,
+      category: 'engine',
+      brand: 'Lazy',
+      model: 'Navy 30',
+      defaultMaintenanceDays: 30,
+      specsJson: { hp: 30 },
+      partsJson: [{ name: 'Oil filter', quantity: 1 }],
+    })
+    createdEquipmentTemplateIds.push(equipmentTemplate.id)
+    const installedAt = new Date(Date.now() - 1000 * 60 * 60 * 24 * 45).toISOString()
+    const equipment = await post<Json>(`${baseUrl}/equipment?userId=${captain.id}`, {
+      vesselId: vessel.id,
+      templateId: equipmentTemplate.id,
+      name: `Selftest Engine ${suffix}`,
+      category: 'engine',
+      status: 'active',
+      installedAt,
+      maintenanceIntervalDays: 30,
+    })
+    createdEquipmentIds.push(equipment.id)
+    assert.ok(equipment.nextDueAt)
+    const dueEquipment = await get<Json[]>(`${baseUrl}/equipment/due?vesselId=${vessel.id}&withinDays=10&userId=${captain.id}`)
+    assert.ok(dueEquipment.some((item) => item.id === equipment.id))
+
+    const serviceRecord = await post<Json>(`${baseUrl}/equipment/${equipment.id}/maintenance?userId=${captain.id}`, {
+      type: 'service',
+      status: 'done',
+      title: 'Selftest service',
+      performedAt: new Date().toISOString(),
+      cost: 12.5,
+    })
+    createdMaintenanceIds.push(serviceRecord.id)
+    assert.equal(serviceRecord.status, 'done')
+    const afterServiceDue = await get<Json[]>(`${baseUrl}/equipment/due?vesselId=${vessel.id}&withinDays=10&userId=${captain.id}`)
+    assert.ok(!afterServiceDue.some((item) => item.id === equipment.id))
+    const faultRecord = await post<Json>(`${baseUrl}/equipment/${equipment.id}/maintenance?userId=${captain.id}`, {
+      type: 'fault',
+      status: 'open',
+      title: 'Selftest fault',
+    })
+    createdMaintenanceIds.push(faultRecord.id)
+    const equipmentDetail = await get<Json>(`${baseUrl}/equipment/${equipment.id}?userId=${captain.id}`)
+    assert.ok((equipmentDetail.maintenanceRecords as Json[]).some((item) => item.id === serviceRecord.id))
+    const maintenanceLedger = await get<Json[]>(`${baseUrl}/rewards/ledger?userId=${captain.id}`)
+    assert.ok(maintenanceLedger.some((item) => item.ruleKey === 'maintenance.completed' && item.sourceId === serviceRecord.id))
+    const deletedEquipment = await del<Json>(`${baseUrl}/equipment/${equipment.id}?userId=${captain.id}`)
+    assert.ok(deletedEquipment.deletedAt)
+
     const poi = await post<Json>(`${baseUrl}/pois?userId=${captain.id}`, {
       name: `Selftest Light ${suffix}`,
       type: 'lighthouse',
@@ -226,6 +279,9 @@ async function main() {
       await prisma.rewardLedger.deleteMany({ where: { OR: [{ userId: { in: createdUserIds } }, { vesselId: { in: createdVesselIds } }] } })
       await prisma.logEntry.deleteMany({ where: { id: { in: createdLogIds } } })
       await prisma.supplyItem.deleteMany({ where: { id: { in: createdSupplyIds } } })
+      await prisma.maintenanceRecord.deleteMany({ where: { id: { in: createdMaintenanceIds } } })
+      await prisma.equipment.deleteMany({ where: { id: { in: createdEquipmentIds } } })
+      await prisma.equipmentTemplate.deleteMany({ where: { id: { in: createdEquipmentTemplateIds } } })
       await prisma.voyageAuditEvent.deleteMany({ where: { voyageId: { in: createdVoyageIds } } })
       await prisma.voyageParticipant.deleteMany({ where: { voyageId: { in: createdVoyageIds } } })
       await prisma.voyage.deleteMany({ where: { id: { in: createdVoyageIds } } })
@@ -255,6 +311,11 @@ async function post<T>(url: string, body: unknown): Promise<T> {
 
 async function patch<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  return parse<T>(res)
+}
+
+async function del<T>(url: string): Promise<T> {
+  const res = await fetch(url, { method: 'DELETE' })
   return parse<T>(res)
 }
 
