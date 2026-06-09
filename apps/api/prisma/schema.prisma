@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id              String   @id @default(uuid())
+  nickname        String
+  avatarUrl       String?
+  title           String   @default("Harbor Rookie")
+  level           Int      @default(1)
+  xp              Int      @default(0)
+  nextLevelXp     Int      @default(120)
+  tokenVersion    Int      @default(0)
+  currentVesselId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  vessels      Vessel[]          @relation("VesselOwner")
+  memberships  VesselMembership[]
+  rewardLedger RewardLedger[]
+}
+
+model Vessel {
+  id            String   @id @default(uuid())
+  ownerId       String
+  name          String
+  type          String?
+  homePort      String?
+  title         String   @default("First Wake")
+  level         Int      @default(1)
+  xp            Int      @default(0)
+  nextLevelXp   Int      @default(180)
+  sceneTemplate String   @default("open_sea")
+  deletedAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  owner        User               @relation("VesselOwner", fields: [ownerId], references: [id])
+  memberships  VesselMembership[]
+  voyages      Voyage[]
+  rewardLedger RewardLedger[]
+
+  @@index([ownerId, deletedAt])
+}
+
+model VesselMembership {
+  id        String   @id @default(uuid())
+  vesselId  String
+  userId    String
+  role      String   @default("captain")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vessel Vessel @relation(fields: [vesselId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([vesselId, userId])
+  @@index([userId])
+}
+
+model Voyage {
+  id                String    @id @default(uuid())
+  ownerId           String
+  vesselId          String
+  name              String
+  status            String    @default("planned")
+  departureName     String?
+  destinationName   String?
+  plannedStartAt    DateTime?
+  startedAt         DateTime?
+  endedAt           DateTime?
+  needsConfirmation Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  vessel Vessel @relation(fields: [vesselId], references: [id])
+
+  @@index([ownerId, status])
+  @@index([vesselId, status])
+}
+
+model RewardRule {
+  id                   String   @id @default(uuid())
+  key                  String   @unique
+  sourceCategory       String
+  xpAmount             Int      @default(0)
+  mileageAmount        Int      @default(0)
+  mileageRequiresReview Boolean @default(true)
+  dailyCap             Int?
+  enabled              Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model RewardLedger {
+  id                String   @id @default(uuid())
+  userId            String?
+  vesselId          String?
+  ruleKey           String
+  sourceCategory    String
+  xpAmount          Int      @default(0)
+  mileageAmount     Int      @default(0)
+  mileageStatus     String   @default("pending")
+  sourceType        String
+  sourceId          String
+  anomalyScore      Float?
+  reviewNote        String?
+  settledAt         DateTime?
+  createdAt         DateTime @default(now())
+
+  user   User?   @relation(fields: [userId], references: [id])
+  vessel Vessel? @relation(fields: [vesselId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([vesselId, createdAt])
+  @@index([mileageStatus])
+}

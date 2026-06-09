@@ -1,0 +1,33 @@
+{
+  "name": "@lazynavy-v3/api",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "tsc && node dist/main.js",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
+  },
+  "dependencies": {
+    "@lazynavy-v3/config": "workspace:*",
+    "@lazynavy-v3/types": "workspace:*",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-fastify": "^11.0.0",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "dotenv": "^17.4.2",
+    "pg": "^8.20.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.20.0",
+    "prisma": "^7.8.0",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "LazyNavy V3",
+    "slug": "lazynavy-v3",
+    "scheme": "lazynavyv3",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true
+  }
+}
