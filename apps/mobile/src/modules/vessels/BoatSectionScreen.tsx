@@ -115,6 +115,19 @@ function OverviewScreen() {
     }
   }
 
+  async function setStatus(status: string) {
+    if (!vessel?.id) return
+    setBusy(true)
+    try {
+      await updateVessel(vessel.id, { sceneTemplate: vessel.sceneTemplate, operationalStatus: status })
+      await load()
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to update status')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function markStep(step: VesselSetupStep, action: 'complete' | 'skip') {
     if (!vessel?.id) return
     setBusy(true)
@@ -160,6 +173,13 @@ function OverviewScreen() {
                   <TextInput value={name} onChangeText={setName} placeholder="Boat name" style={styles.input} />
                   <TextInput value={homePort} onChangeText={setHomePort} placeholder="Home port" style={styles.input} />
                   <Pressable disabled={busy} style={styles.primary} onPress={saveProfile}><Text style={styles.primaryText}>Save Profile</Text></Pressable>
+                  <View style={styles.actions}>
+                    {['docked', 'underway', 'maintenance'].map((status) => (
+                      <Pressable key={status} disabled={busy} style={styles.smallButton} onPress={() => setStatus(status)}>
+                        <Text style={styles.secondaryText}>{status}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
                 </View>
                 <View style={styles.card}>
                   <View style={styles.cardHead}>

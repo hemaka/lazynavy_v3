@@ -20,6 +20,7 @@ async function main() {
   const crewEmail = `selftest-crew-${suffix}`
   const createdUserIds: string[] = []
   const createdVesselIds: string[] = []
+  const createdVesselModelIds: string[] = []
   const createdVoyageIds: string[] = []
   const createdLogIds: string[] = []
   const createdPoiIds: string[] = []
@@ -55,7 +56,18 @@ async function main() {
     assert.deepEqual(emptyHud.shortcuts, [])
 
     console.log('v3-core selftest: create vessel')
+    const vesselModel = await post<Json>(`${baseUrl}/vessels/models`, {
+      brand: `Selftest Brand ${suffix}`,
+      model: `Selftest Model ${suffix}`,
+      type: 'sailboat',
+      lengthFt: 38,
+      equipmentDefaultsJson: [
+        { name: `Selftest Factory Engine ${suffix}`, category: 'engine', maintenanceIntervalDays: 90, location: 'Engine room' },
+      ],
+    })
+    createdVesselModelIds.push(vesselModel.id)
     const vessel = await post<Json>(`${baseUrl}/vessels?userId=${captain.id}`, {
+      modelId: vesselModel.id,
       name: `Selftest Vessel ${suffix}`,
       type: 'sailboat',
       homePort: 'Test Marina',
@@ -75,9 +87,13 @@ async function main() {
       registeredName: `LN-${suffix}`,
       buildYear: 2025,
       sceneTemplate: 'marina_night',
+      operationalStatus: 'underway',
     })
     assert.equal(updatedVessel.registeredName, `LN-${suffix}`)
     assert.equal(updatedVessel.sceneTemplate, 'marina_night')
+    assert.equal(updatedVessel.operationalStatus, 'underway')
+    const copiedEquipment = await get<Json[]>(`${baseUrl}/equipment?vesselId=${vessel.id}&status=pending_confirmation&userId=${captain.id}`)
+    assert.ok(copiedEquipment.some((item) => item.name === `Selftest Factory Engine ${suffix}`))
 
     const invite = await post<Json>(`${baseUrl}/vessels/${vessel.id}/invitations?userId=${captain.id}`, { role: 'crew', expiresInDays: 7 })
     createdInvitationIds.push(invite.id)
@@ -337,7 +353,7 @@ async function main() {
       await prisma.notification.deleteMany({ where: { userId: { in: createdUserIds } } })
       await prisma.manualDocument.deleteMany({ where: { id: { in: createdManualIds } } })
       await prisma.maintenanceRecord.deleteMany({ where: { id: { in: createdMaintenanceIds } } })
-      await prisma.equipment.deleteMany({ where: { id: { in: createdEquipmentIds } } })
+      await prisma.equipment.deleteMany({ where: { OR: [{ id: { in: createdEquipmentIds } }, { vesselId: { in: createdVesselIds } }] } })
       await prisma.equipmentTemplate.deleteMany({ where: { id: { in: createdEquipmentTemplateIds } } })
       await prisma.voyageAuditEvent.deleteMany({ where: { voyageId: { in: createdVoyageIds } } })
       await prisma.voyageChecklistItem.deleteMany({ where: { voyageId: { in: createdVoyageIds } } })
@@ -350,6 +366,7 @@ async function main() {
       await prisma.chatThread.deleteMany({ where: { id: { in: createdChatThreadIds } } })
       await prisma.vesselMembership.deleteMany({ where: { OR: [{ userId: { in: createdUserIds } }, { vesselId: { in: createdVesselIds } }] } })
       await prisma.vessel.deleteMany({ where: { id: { in: createdVesselIds } } })
+      await prisma.vesselModel.deleteMany({ where: { id: { in: createdVesselModelIds } } })
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } })
     } catch (cleanupErr) {
       console.error('v3-core selftest cleanup failed', cleanupErr)

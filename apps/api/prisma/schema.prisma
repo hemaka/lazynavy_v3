@@ -37,6 +37,7 @@ model User {
 model Vessel {
   id            String   @id @default(uuid())
   ownerId       String
+  modelId       String?
   name          String
   type          String?
   homePort      String?
@@ -51,12 +52,14 @@ model Vessel {
   availableMileagePoints Int @default(0)
   pendingMileagePoints   Int @default(0)
   sceneTemplate String   @default("open_sea")
+  operationalStatus String @default("docked")
   setupStatus   String   @default("started")
   deletedAt     DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   owner        User               @relation("VesselOwner", fields: [ownerId], references: [id])
+  model        VesselModel?       @relation(fields: [modelId], references: [id])
   memberships  VesselMembership[]
   invitations  VesselInvitation[]
   setupSteps   VesselSetupStep[]
@@ -70,6 +73,27 @@ model Vessel {
   rewardLedger RewardLedger[]
 
   @@index([ownerId, deletedAt])
+  @@index([modelId])
+}
+
+model VesselModel {
+  id          String   @id @default(uuid())
+  brand       String
+  model       String
+  type        String?
+  lengthFt    Float?
+  yearStart   Int?
+  yearEnd     Int?
+  specsJson   Json?
+  equipmentDefaultsJson Json?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vessels Vessel[]
+
+  @@unique([brand, model])
+  @@index([type, active])
 }
 
 model VesselMembership {

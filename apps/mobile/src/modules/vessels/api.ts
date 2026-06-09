@@ -19,7 +19,7 @@ export function listVesselRoles() {
   return getJson<Array<{ key: string; name: string; permissions: string[] }>>('/vessels/roles')
 }
 
-export function updateVessel(vesselId: string, body: { name?: string; homePort?: string; sceneTemplate?: string }) {
+export function updateVessel(vesselId: string, body: { name?: string; homePort?: string; sceneTemplate?: string; operationalStatus?: string }) {
   return patchJson(`/vessels/${vesselId}`, body)
 }
 

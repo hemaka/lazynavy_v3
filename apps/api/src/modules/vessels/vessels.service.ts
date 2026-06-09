@@ -20,7 +20,33 @@ const SETUP_STEPS = [
   { key: 'crew', title: 'Crew invite', sortOrder: 40 },
 ] as const
 
+const DEFAULT_VESSEL_MODELS = [
+  {
+    brand: 'Beneteau',
+    model: 'Oceanis 38.1',
+    type: 'sailboat',
+    lengthFt: 37.8,
+    specsJson: { cabins: 2, rig: 'sloop' },
+    equipmentDefaultsJson: [
+      { name: 'Auxiliary Diesel Engine', category: 'engine', maintenanceIntervalDays: 90, location: 'Engine room' },
+      { name: 'VHF Radio', category: 'navigation', maintenanceIntervalDays: 180, location: 'Nav station' },
+    ],
+  },
+  {
+    brand: 'Jeanneau',
+    model: 'Sun Odyssey 410',
+    type: 'sailboat',
+    lengthFt: 40.5,
+    specsJson: { cabins: 3, rig: 'sloop' },
+    equipmentDefaultsJson: [
+      { name: 'Yanmar Diesel Engine', category: 'engine', maintenanceIntervalDays: 90, location: 'Engine room' },
+      { name: 'Life Raft', category: 'safety', maintenanceIntervalDays: 365, location: 'Cockpit locker' },
+    ],
+  },
+] as const
+
 export interface CreateVesselInput {
+  modelId?: string
   name: string
   type?: string
   homePort?: string
@@ -37,6 +63,7 @@ export interface UpdateVesselInput {
   buildYear?: number
   acquisitionYear?: number
   sceneTemplate?: string
+  operationalStatus?: string
 }
 
 export interface AddCrewInput {
@@ -66,6 +93,40 @@ export class VesselsService {
     })
   }
 
+  async listModels(type?: string) {
+    await this.ensureDefaultModels()
+    return this.prisma.vesselModel.findMany({
+      where: { active: true, ...(type ? { type } : {}) },
+      orderBy: [{ brand: 'asc' }, { model: 'asc' }],
+    })
+  }
+
+  async createModel(input: { brand: string; model: string; type?: string; lengthFt?: number; yearStart?: number; yearEnd?: number; specsJson?: unknown; equipmentDefaultsJson?: unknown }) {
+    if (!input.brand?.trim() || !input.model?.trim()) throw new BadRequestException('Brand and model are required')
+    return this.prisma.vesselModel.upsert({
+      where: { brand_model: { brand: input.brand.trim(), model: input.model.trim() } },
+      create: {
+        brand: input.brand.trim(),
+        model: input.model.trim(),
+        type: input.type,
+        lengthFt: input.lengthFt,
+        yearStart: input.yearStart,
+        yearEnd: input.yearEnd,
+        specsJson: input.specsJson as any,
+        equipmentDefaultsJson: input.equipmentDefaultsJson as any,
+      },
+      update: {
+        type: input.type,
+        lengthFt: input.lengthFt,
+        yearStart: input.yearStart,
+        yearEnd: input.yearEnd,
+        specsJson: input.specsJson as any,
+        equipmentDefaultsJson: input.equipmentDefaultsJson as any,
+        active: true,
+      },
+    })
+  }
+
   listForUser(userId: string) {
     return this.prisma.vessel.findMany({
       where: {
@@ -83,6 +144,7 @@ export class VesselsService {
     const vessel = await this.prisma.vessel.create({
       data: {
         ownerId: userId,
+        modelId: input.modelId,
         name: input.name.trim(),
         type: input.type,
         homePort: input.homePort,
@@ -95,6 +157,7 @@ export class VesselsService {
       },
       include: { memberships: true, setupSteps: { orderBy: { sortOrder: 'asc' } } },
     })
+    if (input.modelId) await this.copyModelEquipment(vessel.id, input.modelId)
     await this.messaging.ensureBoatThread(vessel.id, `${vessel.name} Crew`, userId)
     await this.prisma.user.update({ where: { id: userId }, data: { currentVesselId: vessel.id } })
     return vessel
@@ -110,6 +173,7 @@ export class VesselsService {
       ...(input.buildYear !== undefined ? { buildYear: input.buildYear } : {}),
       ...(input.acquisitionYear !== undefined ? { acquisitionYear: input.acquisitionYear } : {}),
       ...(input.sceneTemplate !== undefined ? { sceneTemplate: input.sceneTemplate } : {}),
+      ...(input.operationalStatus !== undefined ? { operationalStatus: input.operationalStatus } : {}),
     }
     return this.prisma.vessel.update({
       where: { id: vesselId },
@@ -284,6 +348,36 @@ export class VesselsService {
         where: { key: template.key },
         create: template,
         update: { name: template.name, rank: template.rank, permissions: template.permissions, enabled: true },
+      })
+    }
+  }
+
+  private async ensureDefaultModels() {
+    for (const model of DEFAULT_VESSEL_MODELS) {
+      await this.prisma.vesselModel.upsert({
+        where: { brand_model: { brand: model.brand, model: model.model } },
+        create: model,
+        update: {},
+      })
+    }
+  }
+
+  private async copyModelEquipment(vesselId: string, modelId: string) {
+    const model = await this.prisma.vesselModel.findUnique({ where: { id: modelId } })
+    const defaults = Array.isArray(model?.equipmentDefaultsJson) ? model.equipmentDefaultsJson as any[] : []
+    for (const item of defaults) {
+      if (!item?.name) continue
+      await this.prisma.equipment.create({
+        data: {
+          vesselId,
+          name: String(item.name),
+          category: item.category ?? 'other',
+          status: 'pending_confirmation',
+          location: item.location,
+          maintenanceIntervalDays: item.maintenanceIntervalDays,
+          partsJson: item.partsJson,
+          metadata: { copiedFromModelId: modelId },
+        },
       })
     }
   }

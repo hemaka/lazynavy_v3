@@ -20,6 +20,16 @@ export class VesselsController {
     return this.vessels.listRoles()
   }
 
+  @Get('models')
+  async models(@Query('type') type?: string) {
+    return this.vessels.listModels(type)
+  }
+
+  @Post('models')
+  async createModel(@Body() body: { brand: string; model: string; type?: string; lengthFt?: number; yearStart?: number; yearEnd?: number; specsJson?: unknown; equipmentDefaultsJson?: unknown }) {
+    return this.vessels.createModel(body)
+  }
+
   @Post('join')
   async join(@Body() body: { code: string }, @Query('userId') userId?: string) {
     const user = userId ? await this.identity.getUser(userId) : await this.identity.getOrCreateDevUser()
