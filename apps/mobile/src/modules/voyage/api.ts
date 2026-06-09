@@ -9,6 +9,15 @@ export interface VoyageRecord {
   destinationName?: string | null
   needsConfirmation: boolean
   participants?: Array<{ id: string; userId: string; role: string; status: string }>
+  checklistItems?: VoyageChecklistItem[]
+}
+
+export interface VoyageChecklistItem {
+  id: string
+  title: string
+  status: string
+  completedById?: string | null
+  completedAt?: string | null
 }
 
 export function listVoyages() {
@@ -27,6 +36,14 @@ export function createVoyagePlan(vesselId: string) {
 
 export function startVoyage(voyageId: string) {
   return patchJson<VoyageRecord>(`/voyages/${voyageId}/start`, {})
+}
+
+export function listVoyageChecklist(voyageId: string) {
+  return getJson<VoyageChecklistItem[]>(`/voyages/${voyageId}/checklist`)
+}
+
+export function completeVoyageChecklistItem(voyageId: string, itemId: string) {
+  return patchJson<VoyageChecklistItem>(`/voyages/${voyageId}/checklist/${itemId}/complete`, {})
 }
 
 export function completeVoyage(voyageId: string) {

@@ -4,11 +4,21 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { getCaptainHud } from '../home/api'
 import { colors } from '../../theme/tokens'
-import { completeVoyage, createVoyagePlan, listVoyages, startVoyage, type VoyageRecord } from './api'
+import {
+  completeVoyage,
+  completeVoyageChecklistItem,
+  createVoyagePlan,
+  listVoyageChecklist,
+  listVoyages,
+  startVoyage,
+  type VoyageChecklistItem,
+  type VoyageRecord,
+} from './api'
 
 export function VoyageScreen() {
   const [vesselId, setVesselId] = useState<string | null>(null)
   const [voyages, setVoyages] = useState<VoyageRecord[]>([])
+  const [checklist, setChecklist] = useState<VoyageChecklistItem[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -20,8 +30,10 @@ export function VoyageScreen() {
     setError(null)
     try {
       const [hud, list] = await Promise.all([getCaptainHud(), listVoyages()])
+      const nextActive = list.find((item) => item.status === 'active') ?? list.find((item) => item.status === 'planned') ?? null
       setVesselId(hud.currentVessel?.id ?? null)
       setVoyages(list)
+      setChecklist(nextActive ? await listVoyageChecklist(nextActive.id) : [])
     } catch (err: any) {
       setError(err?.message ?? 'Failed to load voyage')
     } finally {
@@ -53,6 +65,20 @@ export function VoyageScreen() {
     }
   }
 
+  async function completeCheck(item: VoyageChecklistItem) {
+    if (!active) return
+    setBusy(true)
+    setError(null)
+    try {
+      await completeVoyageChecklistItem(active.id, item.id)
+      await load()
+    } catch (err: any) {
+      setError(err?.message ?? 'Checklist update failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <LinearGradient colors={[colors.skyBottom, '#ffffff']} style={styles.screen}>
       <SafeAreaView style={styles.safe}>
@@ -75,6 +101,24 @@ export function VoyageScreen() {
                 <Text style={styles.name}>{active.name}</Text>
                 <Text style={styles.route}>{active.departureName ?? 'Departure'} → {active.destinationName ?? 'Destination'}</Text>
                 <Text style={styles.meta}>{active.needsConfirmation ? 'Needs confirmation' : 'Ready'} · {active.participants?.length ?? 1} participant(s)</Text>
+                {active.status === 'planned' && checklist.length > 0 && (
+                  <View style={styles.checklist}>
+                    <Text style={styles.sectionTitle}>Pre-voyage Checks</Text>
+                    {checklist.map((item) => (
+                      <View key={item.id} style={styles.checkRow}>
+                        <View style={styles.checkText}>
+                          <Text style={styles.rowTitle}>{item.title}</Text>
+                          <Text style={styles.rowStatus}>{item.status}</Text>
+                        </View>
+                        {item.status !== 'done' && (
+                          <Pressable disabled={busy} style={styles.checkButton} onPress={() => completeCheck(item)}>
+                            <Text style={styles.secondaryText}>Done</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
                 <View style={styles.actions}>
                   {active.status === 'planned' && <Pressable disabled={busy} style={styles.primary} onPress={() => act('start')}><Text style={styles.primaryText}>Start</Text></Pressable>}
                   {active.status === 'active' && <Pressable disabled={busy} style={styles.primary} onPress={() => act('complete')}><Text style={styles.primaryText}>Complete</Text></Pressable>}
@@ -135,4 +179,8 @@ const styles = StyleSheet.create({
   row: { padding: 12, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.72)', borderWidth: 1, borderColor: colors.line, flexDirection: 'row', justifyContent: 'space-between' },
   rowTitle: { color: colors.ink, fontWeight: '800' },
   rowStatus: { color: colors.muted, fontWeight: '800', textTransform: 'capitalize' },
+  checklist: { marginTop: 16, gap: 8 },
+  checkRow: { paddingVertical: 9, borderTopWidth: 1, borderTopColor: colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  checkText: { flex: 1 },
+  checkButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.line, alignItems: 'center' },
 })

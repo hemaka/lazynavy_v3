@@ -14,6 +14,12 @@ export interface CreateVoyageInput {
   participantUserIds?: string[]
 }
 
+const DEFAULT_PRE_VOYAGE_CHECKS = [
+  { title: 'Check fuel and battery', sortOrder: 10 },
+  { title: 'Check safety gear', sortOrder: 20 },
+  { title: 'Check weather and route', sortOrder: 30 },
+] as const
+
 @Injectable()
 export class VoyagesService {
   constructor(
@@ -66,8 +72,11 @@ export class VoyagesService {
         auditEvents: {
           create: { actorId: userId, type: 'voyage.created', payload: compactJson({ vesselId: input.vesselId }) },
         },
+        checklistItems: {
+          create: DEFAULT_PRE_VOYAGE_CHECKS.map((item) => ({ ...item })),
+        },
       },
-      include: { participants: true, auditEvents: true },
+      include: { participants: true, auditEvents: true, checklistItems: { orderBy: { sortOrder: 'asc' } } },
     })
     return voyage
   }
@@ -86,16 +95,46 @@ export class VoyagesService {
     return updated
   }
 
-  async start(userId: string, voyageId: string) {
+  async start(userId: string, voyageId: string, input: { skipChecklistWarning?: boolean } = {}) {
     const voyage = await this.ensureVoyageOwner(userId, voyageId)
     if (voyage.status !== 'planned') throw new BadRequestException('Only planned voyage can be started')
     if (voyage.needsConfirmation) throw new BadRequestException('Voyage still needs confirmation')
+    const incompleteChecks = await this.prisma.voyageChecklistItem.findMany({
+      where: { voyageId, status: { not: 'done' } },
+      orderBy: { sortOrder: 'asc' },
+    })
+    if (incompleteChecks.length > 0 && !input.skipChecklistWarning) {
+      throw new BadRequestException({
+        message: 'Pre-voyage checklist is incomplete',
+        incompleteChecklistItems: incompleteChecks,
+      })
+    }
     const updated = await this.prisma.voyage.update({
       where: { id: voyageId },
       data: { status: 'active', startedAt: new Date() },
-      include: { participants: true, auditEvents: true },
+      include: { participants: true, auditEvents: true, checklistItems: { orderBy: { sortOrder: 'asc' } } },
     })
     await this.addAudit(voyageId, userId, 'voyage.started', {})
+    return updated
+  }
+
+  async listChecklist(userId: string, voyageId: string) {
+    await this.ensureVoyageAccess(userId, voyageId)
+    return this.prisma.voyageChecklistItem.findMany({
+      where: { voyageId },
+      orderBy: { sortOrder: 'asc' },
+    })
+  }
+
+  async completeChecklistItem(userId: string, voyageId: string, itemId: string) {
+    await this.ensureVoyageAccess(userId, voyageId)
+    const item = await this.prisma.voyageChecklistItem.findFirst({ where: { id: itemId, voyageId } })
+    if (!item) throw new BadRequestException('Checklist item not found')
+    const updated = await this.prisma.voyageChecklistItem.update({
+      where: { id: item.id },
+      data: { status: 'done', completedById: userId, completedAt: new Date() },
+    })
+    await this.addAudit(voyageId, userId, 'checklist.completed', { itemId })
     return updated
   }
 

@@ -148,6 +148,7 @@ model Voyage {
   vessel Vessel @relation(fields: [vesselId], references: [id])
   participants VoyageParticipant[]
   auditEvents VoyageAuditEvent[]
+  checklistItems VoyageChecklistItem[]
   logEntries LogEntry[]
   discoveryUnlocks DiscoveryUnlock[]
 
@@ -183,6 +184,23 @@ model VoyageAuditEvent {
   voyage Voyage @relation(fields: [voyageId], references: [id])
 
   @@index([voyageId, createdAt])
+}
+
+model VoyageChecklistItem {
+  id          String   @id @default(uuid())
+  voyageId    String
+  title       String
+  category    String   @default("pre_voyage")
+  status      String   @default("open")
+  sortOrder   Int      @default(0)
+  completedById String?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  voyage Voyage @relation(fields: [voyageId], references: [id])
+
+  @@index([voyageId, status])
 }
 
 model LogEntry {

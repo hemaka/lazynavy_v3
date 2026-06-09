@@ -31,10 +31,24 @@ export class VoyagesController {
   }
 
   @Patch(':id/start')
-  async start(@Param('id') id: string, @Query('userId') userId?: string) {
+  async start(@Param('id') id: string, @Body() body: { skipChecklistWarning?: boolean } = {}, @Query('userId') userId?: string) {
     const user = userId ? await this.identity.getUser(userId) : await this.identity.getOrCreateDevUser()
     if (!user) throw new Error('User not found')
-    return this.voyages.start(user.id, id)
+    return this.voyages.start(user.id, id, body)
+  }
+
+  @Get(':id/checklist')
+  async checklist(@Param('id') id: string, @Query('userId') userId?: string) {
+    const user = userId ? await this.identity.getUser(userId) : await this.identity.getOrCreateDevUser()
+    if (!user) return []
+    return this.voyages.listChecklist(user.id, id)
+  }
+
+  @Patch(':id/checklist/:itemId/complete')
+  async completeChecklist(@Param('id') id: string, @Param('itemId') itemId: string, @Query('userId') userId?: string) {
+    const user = userId ? await this.identity.getUser(userId) : await this.identity.getOrCreateDevUser()
+    if (!user) throw new Error('User not found')
+    return this.voyages.completeChecklistItem(user.id, id, itemId)
   }
 
   @Patch(':id/complete')

@@ -115,6 +115,12 @@ async function main() {
 
     console.log('v3-core selftest: complete voyage')
     await patch<Json>(`${baseUrl}/voyages/${voyage.id}/confirm?userId=${crew.id}`, {})
+    await assertRejectsStatus(() => patch<Json>(`${baseUrl}/voyages/${voyage.id}/start?userId=${captain.id}`, {}), 'Pre-voyage checklist is incomplete')
+    const checklist = await get<Json[]>(`${baseUrl}/voyages/${voyage.id}/checklist?userId=${captain.id}`)
+    assert.equal(checklist.length, 3)
+    for (const item of checklist) {
+      await patch<Json>(`${baseUrl}/voyages/${voyage.id}/checklist/${item.id}/complete?userId=${crew.id}`, {})
+    }
     const started = await patch<Json>(`${baseUrl}/voyages/${voyage.id}/start?userId=${captain.id}`, {})
     assert.equal(started.status, 'active')
 
@@ -263,6 +269,9 @@ async function main() {
     assert.deepEqual(auditEvents.map((event) => event.type), [
       'voyage.created',
       'participant.confirmed',
+      'checklist.completed',
+      'checklist.completed',
+      'checklist.completed',
       'voyage.started',
       'voyage.completed',
     ])
@@ -283,6 +292,7 @@ async function main() {
       await prisma.equipment.deleteMany({ where: { id: { in: createdEquipmentIds } } })
       await prisma.equipmentTemplate.deleteMany({ where: { id: { in: createdEquipmentTemplateIds } } })
       await prisma.voyageAuditEvent.deleteMany({ where: { voyageId: { in: createdVoyageIds } } })
+      await prisma.voyageChecklistItem.deleteMany({ where: { voyageId: { in: createdVoyageIds } } })
       await prisma.voyageParticipant.deleteMany({ where: { voyageId: { in: createdVoyageIds } } })
       await prisma.voyage.deleteMany({ where: { id: { in: createdVoyageIds } } })
       await prisma.vesselInvitation.deleteMany({ where: { id: { in: createdInvitationIds } } })
@@ -317,6 +327,16 @@ async function patch<T>(url: string, body: unknown): Promise<T> {
 async function del<T>(url: string): Promise<T> {
   const res = await fetch(url, { method: 'DELETE' })
   return parse<T>(res)
+}
+
+async function assertRejectsStatus(fn: () => Promise<unknown>, expectedText: string) {
+  try {
+    await fn()
+  } catch (err: any) {
+    assert.ok(String(err?.message ?? err).includes(expectedText))
+    return
+  }
+  assert.fail(`Expected request to reject with ${expectedText}`)
 }
 
 async function parse<T>(res: Response): Promise<T> {
