@@ -77,7 +77,7 @@ export function HomeCaptainHudScreen() {
           <View style={styles.playerHud}>
             <View style={styles.avatarWrap}>
               <View style={styles.avatar}><Text style={styles.avatarText}>{hud.user.nickname.slice(0, 1)}</Text></View>
-              <View style={styles.rankBadge}><Text style={styles.rankText}>{hud.user.level}</Text></View>
+              <View style={styles.rankBadge}><Text style={styles.rankText}>Lv. {hud.user.level}</Text></View>
             </View>
             <View style={styles.playerMain}>
               <View style={styles.playerRow}>
@@ -270,8 +270,8 @@ const styles = StyleSheet.create({
   avatarWrap: { position: 'absolute', left: -6, top: -4, width: 76, height: 76 },
   avatar: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#bfe9ff', borderWidth: 4, borderColor: colors.white, alignItems: 'center', justifyContent: 'center', shadowColor: '#075985', shadowOpacity: 0.22, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
   avatarText: { color: colors.ink, fontWeight: '900', fontSize: 26 },
-  rankBadge: { position: 'absolute', left: 4, bottom: 4, width: 30, height: 30, borderRadius: 9, backgroundColor: colors.ink, borderWidth: 3, borderColor: '#fbbf24', alignItems: 'center', justifyContent: 'center' },
-  rankText: { color: '#fbbf24', fontSize: 16, fontWeight: '900' },
+  rankBadge: { position: 'absolute', left: 1, bottom: 7, minWidth: 44, height: 24, paddingHorizontal: 7, borderRadius: 8, backgroundColor: 'rgba(235,248,255,0.92)', borderWidth: 1, borderColor: 'rgba(18,48,71,0.18)', alignItems: 'center', justifyContent: 'center' },
+  rankText: { color: '#071735', fontSize: 11, fontWeight: '900' },
   playerMain: { flex: 1 },
   playerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 24 },
   playerName: { color: '#071735', fontSize: 16, fontWeight: '900', maxWidth: width * 0.22 },
