@@ -7,6 +7,7 @@
     "build": "nest build",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
+    "selftest:v3-core": "tsc && node dist/tests/v3-core.self-test.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },

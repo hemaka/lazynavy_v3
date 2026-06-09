@@ -22,6 +22,8 @@ export interface UserSummary {
   level: number
   xp: number
   nextLevelXp: number
+  availableMileagePoints: number
+  pendingMileagePoints: number
   currentVesselId?: Id | null
 }
 
@@ -34,6 +36,9 @@ export interface VesselSummary {
   level: number
   xp: number
   nextLevelXp: number
+  badges: string[]
+  availableMileagePoints: number
+  pendingMileagePoints: number
   crewCount: number
   userRole: CrewRole
   sceneTemplate: BoatSceneTemplateKey

@@ -22,3 +22,13 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
   if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)
   return res.json() as Promise<T>
 }
+
+export async function patchJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`PATCH ${path} failed: ${res.status}`)
+  return res.json() as Promise<T>
+}

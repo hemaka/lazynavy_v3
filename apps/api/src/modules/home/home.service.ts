@@ -32,6 +32,9 @@ export class HomeService {
         level: v.level,
         xp: v.xp,
         nextLevelXp: v.nextLevelXp,
+        badges: parseBadges(v.badgesJson),
+        availableMileagePoints: v.availableMileagePoints,
+        pendingMileagePoints: v.pendingMileagePoints,
         crewCount: v.memberships.length,
         userRole: (membership?.role ?? 'captain') as CrewRole,
         sceneTemplate: normalizeScene(v.sceneTemplate),
@@ -48,6 +51,8 @@ export class HomeService {
         level: user.level,
         xp: user.xp,
         nextLevelXp: user.nextLevelXp,
+        availableMileagePoints: user.availableMileagePoints,
+        pendingMileagePoints: user.pendingMileagePoints,
         currentVesselId: user.currentVesselId,
       },
       currentVessel: currentSummary,
@@ -97,4 +102,9 @@ export class HomeService {
 function normalizeScene(value: string): BoatSceneTemplateKey {
   const allowed: BoatSceneTemplateKey[] = ['empty_sea', 'open_sea', 'anchorage', 'marina', 'yacht_club', 'maintenance_yard', 'in_voyage']
   return allowed.includes(value as BoatSceneTemplateKey) ? (value as BoatSceneTemplateKey) : 'open_sea'
+}
+
+function parseBadges(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is string => typeof item === 'string')
 }

@@ -14,6 +14,8 @@ model User {
   level           Int      @default(1)
   xp              Int      @default(0)
   nextLevelXp     Int      @default(120)
+  availableMileagePoints Int @default(0)
+  pendingMileagePoints   Int @default(0)
   tokenVersion    Int      @default(0)
   currentVesselId String?
   createdAt       DateTime @default(now())
@@ -21,6 +23,7 @@ model User {
 
   vessels      Vessel[]          @relation("VesselOwner")
   memberships  VesselMembership[]
+  voyageParticipants VoyageParticipant[]
   rewardLedger RewardLedger[]
 }
 
@@ -34,6 +37,9 @@ model Vessel {
   level         Int      @default(1)
   xp            Int      @default(0)
   nextLevelXp   Int      @default(180)
+  badgesJson    Json?
+  availableMileagePoints Int @default(0)
+  pendingMileagePoints   Int @default(0)
   sceneTemplate String   @default("open_sea")
   deletedAt     DateTime?
   createdAt     DateTime @default(now())
@@ -78,9 +84,41 @@ model Voyage {
   updatedAt         DateTime  @updatedAt
 
   vessel Vessel @relation(fields: [vesselId], references: [id])
+  participants VoyageParticipant[]
+  auditEvents VoyageAuditEvent[]
 
   @@index([ownerId, status])
   @@index([vesselId, status])
+}
+
+model VoyageParticipant {
+  id          String   @id @default(uuid())
+  voyageId    String
+  userId      String
+  role        String   @default("crew")
+  status      String   @default("invited")
+  confirmedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  voyage Voyage @relation(fields: [voyageId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([voyageId, userId])
+  @@index([userId, status])
+}
+
+model VoyageAuditEvent {
+  id        String   @id @default(uuid())
+  voyageId  String
+  actorId   String?
+  type      String
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  voyage Voyage @relation(fields: [voyageId], references: [id])
+
+  @@index([voyageId, createdAt])
 }
 
 model RewardRule {
@@ -98,6 +136,7 @@ model RewardRule {
 
 model RewardLedger {
   id                String   @id @default(uuid())
+  idempotencyKey    String   @unique
   userId            String?
   vesselId          String?
   ruleKey           String

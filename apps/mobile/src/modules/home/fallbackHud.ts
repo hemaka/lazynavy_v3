@@ -8,6 +8,8 @@ export const fallbackHud: CaptainHudResponse = {
     level: 1,
     xp: 35,
     nextLevelXp: 120,
+    availableMileagePoints: 0,
+    pendingMileagePoints: 20,
     currentVesselId: 'local-vessel',
   },
   currentVessel: {
@@ -19,6 +21,9 @@ export const fallbackHud: CaptainHudResponse = {
     level: 1,
     xp: 62,
     nextLevelXp: 180,
+    badges: [],
+    availableMileagePoints: 0,
+    pendingMileagePoints: 20,
     crewCount: 3,
     userRole: 'captain',
     sceneTemplate: 'marina',

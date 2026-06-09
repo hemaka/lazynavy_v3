@@ -81,7 +81,7 @@ export function HomeCaptainHudScreen() {
                 <Text style={styles.level}>LV {hud.user.level}</Text>
               </View>
               <View style={styles.xpTrack}><View style={[styles.xpFill, { width: `${xpPercent * 100}%` }]} /></View>
-              <Text style={styles.title}>{hud.user.title}</Text>
+              <Text style={styles.title}>{hud.user.title} · {hud.user.availableMileagePoints} mi · {hud.user.pendingMileagePoints} pending</Text>
             </View>
             <Pressable style={styles.previewToggle} onPress={() => setEmptyPreview((value) => !value)}>
               <Text style={styles.previewText}>{emptyPreview ? 'HUD' : 'Empty'}</Text>
@@ -102,8 +102,8 @@ export function HomeCaptainHudScreen() {
 
             <View style={styles.boatNameWrap}>
               <Pressable style={styles.boatName} onPress={() => router.push('/boat/overview')}>
-                <Text style={styles.boatNameText}>{hud.currentVessel?.name}</Text>
-                <Text style={styles.boatNameSub}>tap to switch / details</Text>
+              <Text style={styles.boatNameText}>{hud.currentVessel?.name}</Text>
+                <Text style={styles.boatNameSub}>LV {hud.currentVessel?.level} · {hud.currentVessel?.pendingMileagePoints ?? 0} pending miles</Text>
               </Pressable>
             </View>
 
