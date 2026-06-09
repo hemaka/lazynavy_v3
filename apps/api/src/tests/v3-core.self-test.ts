@@ -95,6 +95,9 @@ async function main() {
 
     const roles = await get<Json[]>(`${baseUrl}/vessels/roles`)
     assert.ok(roles.some((role) => role.key === 'captain'))
+    const captainPermissions = await get<Json>(`${baseUrl}/vessels/${vessel.id}/permissions/me?userId=${captain.id}`)
+    assert.equal(captainPermissions.role, 'owner')
+    assert.ok(captainPermissions.permissions.includes('vessel.manage'))
 
     const updatedVessel = await patch<Json>(`${baseUrl}/vessels/${vessel.id}?userId=${captain.id}`, {
       registeredName: `LN-${suffix}`,

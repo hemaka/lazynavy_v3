@@ -65,6 +65,13 @@ export class VesselsController {
     return this.vessels.setCurrent(user.id, vesselId)
   }
 
+  @Get(':id/permissions/me')
+  async myPermissions(@Param('id') vesselId: string, @Query('userId') userId?: string) {
+    const user = userId ? await this.identity.getUser(userId) : await this.identity.getOrCreateDevUser()
+    if (!user) throw new Error('User not found')
+    return this.vessels.permissionsForUser(user.id, vesselId)
+  }
+
   @Post(':id/crew')
   async addCrew(@Param('id') vesselId: string, @Body() body: AddCrewInput, @Query('userId') userId?: string) {
     const user = userId ? await this.identity.getUser(userId) : await this.identity.getOrCreateDevUser()

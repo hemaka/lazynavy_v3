@@ -93,6 +93,16 @@ export class VesselsService {
     })
   }
 
+  async permissionsForUser(userId: string, vesselId: string) {
+    await this.ensureRoleTemplates()
+    const vessel = await this.ensureUserVessel(userId, vesselId)
+    const membership = vessel.memberships.find((item) => item.userId === userId)
+    const roleKey = vessel.ownerId === userId ? 'owner' : membership?.role ?? 'guest'
+    const role = await this.prisma.vesselRoleTemplate.findUnique({ where: { key: roleKey } })
+    const permissions = Array.isArray(role?.permissions) ? role.permissions as string[] : []
+    return { vesselId, role: roleKey, permissions }
+  }
+
   async listModels(type?: string) {
     await this.ensureDefaultModels()
     return this.prisma.vesselModel.findMany({
@@ -330,16 +340,23 @@ export class VesselsService {
 
   private async ensureCanManage(userId: string, vesselId: string) {
     const vessel = await this.ensureUserVessel(userId, vesselId)
-    const actorMembership = vessel.memberships.find((m) => m.userId === userId)
-    if (vessel.ownerId !== userId && actorMembership?.role !== 'captain') {
+    if (!await this.hasPermission(userId, vesselId, 'vessel.manage')) {
       throw new ForbiddenException('Only owner or captain can manage vessel')
     }
     return vessel
   }
 
   private async ensureCanManageCrew(userId: string, vesselId: string) {
-    const vessel = await this.ensureCanManage(userId, vesselId)
+    const vessel = await this.ensureUserVessel(userId, vesselId)
+    if (!await this.hasPermission(userId, vesselId, 'crew.manage')) {
+      throw new ForbiddenException('Only owner or captain can manage crew')
+    }
     return vessel
+  }
+
+  private async hasPermission(userId: string, vesselId: string, permission: string) {
+    const access = await this.permissionsForUser(userId, vesselId)
+    return access.permissions.includes(permission)
   }
 
   private async ensureRoleTemplates() {
