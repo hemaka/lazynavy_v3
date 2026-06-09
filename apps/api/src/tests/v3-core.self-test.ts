@@ -21,6 +21,11 @@ async function main() {
   const createdUserIds: string[] = []
   const createdVesselIds: string[] = []
   const createdVoyageIds: string[] = []
+  const createdLogIds: string[] = []
+  const createdPoiIds: string[] = []
+  const createdDiscoveryPointIds: string[] = []
+  const createdDiscoveryUnlockIds: string[] = []
+  const createdSupplyIds: string[] = []
   let app: INestApplication | null = null
 
   try {
@@ -100,12 +105,73 @@ async function main() {
     })
     assert.equal(duplicateGrant.id, voyageReward.id)
 
+    console.log('v3-core selftest: logs, supplies, poi, discovery')
+    const log = await post<Json>(`${baseUrl}/logs?userId=${captain.id}`, {
+      vesselId: vessel.id,
+      voyageId: voyage.id,
+      type: 'note',
+      title: `Selftest Log ${suffix}`,
+      body: 'Routine log entry',
+    })
+    createdLogIds.push(log.id)
+    const logLedger = await get<Json[]>(`${baseUrl}/rewards/ledger?userId=${captain.id}`)
+    assert.ok(logLedger.some((item) => item.ruleKey === 'log.created' && item.sourceId === log.id))
+
+    const supply = await post<Json>(`${baseUrl}/vessels/${vessel.id}/supplies?userId=${captain.id}`, {
+      name: 'Fresh Water',
+      category: 'water',
+      unit: 'L',
+      quantity: 20,
+      capacity: 200,
+      warnBelow: 50,
+    })
+    createdSupplyIds.push(supply.id)
+    const lowStock = await get<Json[]>(`${baseUrl}/vessels/${vessel.id}/supplies?userId=${captain.id}&low=1`)
+    assert.ok(lowStock.some((item) => item.id === supply.id))
+    const adjustedSupply = await patch<Json>(`${baseUrl}/vessels/${vessel.id}/supplies/${supply.id}/adjust?userId=${captain.id}`, { delta: 60 })
+    assert.equal(adjustedSupply.quantity, 80)
+
+    const poi = await post<Json>(`${baseUrl}/pois?userId=${captain.id}`, {
+      name: `Selftest Light ${suffix}`,
+      type: 'lighthouse',
+      scope: 'public',
+      lat: 37.8001,
+      lng: -122.4101,
+      description: 'Visible from the bay',
+    })
+    createdPoiIds.push(poi.id)
+    await patch<Json>(`${baseUrl}/pois/${poi.id}/confirm?userId=${crew.id}`, {})
+
+    const point = await post<Json>(`${baseUrl}/discovery-points`, {
+      poiId: poi.id,
+      name: `Selftest Discovery ${suffix}`,
+      type: 'lighthouse',
+      lat: 37.8001,
+      lng: -122.4101,
+      radiusM: 300,
+      description: 'A safe visible landmark',
+    })
+    createdDiscoveryPointIds.push(point.id)
+
+    const unlock = await post<Json>(`${baseUrl}/discovery-unlocks?userId=${captain.id}`, {
+      pointId: point.id,
+      voyageId: voyage.id,
+      photoUrl: 'https://example.com/discovery.jpg',
+      lat: 37.80011,
+      lng: -122.41009,
+    })
+    createdDiscoveryUnlockIds.push(unlock.id)
+    if (unlock.logEntryId) createdLogIds.push(unlock.logEntryId)
+    const discoveryLedger = await get<Json[]>(`${baseUrl}/rewards/ledger?userId=${captain.id}`)
+    assert.ok(discoveryLedger.some((item) => item.ruleKey === 'discovery.unlocked' && item.sourceId === unlock.id))
+
     console.log('v3-core selftest: settle mileage')
     await patch<Json>(`${baseUrl}/rewards/ledger/${voyageReward.id}/settle-mileage`, { approved: true, reviewNote: 'selftest' })
     const settledHud = await get<Json>(`${baseUrl}/home/captain-hud?userId=${captain.id}`)
-    assert.equal(settledHud.user.pendingMileagePoints, 0)
+    assert.equal(settledHud.user.pendingMileagePoints, 10)
     assert.equal(settledHud.user.availableMileagePoints, 20)
     assert.equal(settledHud.currentVessel.availableMileagePoints, 20)
+    assert.equal(settledHud.currentVessel.pendingMileagePoints, 10)
 
     const auditEvents = await prisma.voyageAuditEvent.findMany({ where: { voyageId: voyage.id }, orderBy: { createdAt: 'asc' } })
     assert.deepEqual(auditEvents.map((event) => event.type), [
@@ -120,7 +186,13 @@ async function main() {
     console.log('v3-core selftest: cleanup')
     try {
       if (app) await app.close()
+      await prisma.discoveryUnlock.deleteMany({ where: { id: { in: createdDiscoveryUnlockIds } } })
+      await prisma.discoveryPoint.deleteMany({ where: { id: { in: createdDiscoveryPointIds } } })
+      await prisma.poiConfirm.deleteMany({ where: { poiId: { in: createdPoiIds } } })
+      await prisma.poi.deleteMany({ where: { id: { in: createdPoiIds } } })
       await prisma.rewardLedger.deleteMany({ where: { OR: [{ userId: { in: createdUserIds } }, { vesselId: { in: createdVesselIds } }] } })
+      await prisma.logEntry.deleteMany({ where: { id: { in: createdLogIds } } })
+      await prisma.supplyItem.deleteMany({ where: { id: { in: createdSupplyIds } } })
       await prisma.voyageAuditEvent.deleteMany({ where: { voyageId: { in: createdVoyageIds } } })
       await prisma.voyageParticipant.deleteMany({ where: { voyageId: { in: createdVoyageIds } } })
       await prisma.voyage.deleteMany({ where: { id: { in: createdVoyageIds } } })
