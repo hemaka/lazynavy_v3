@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common'
 import { randomBytes } from 'node:crypto'
 import { PrismaService } from '../../prisma/prisma.service'
+import { MessagingService } from '../messaging/messaging.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { RewardsService } from '../rewards/rewards.service'
 
@@ -52,6 +53,7 @@ export interface CreateInvitationInput {
 export class VesselsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly messaging: MessagingService,
     private readonly notifications: NotificationsService,
     private readonly rewards: RewardsService,
   ) {}
@@ -93,6 +95,7 @@ export class VesselsService {
       },
       include: { memberships: true, setupSteps: { orderBy: { sortOrder: 'asc' } } },
     })
+    await this.messaging.ensureBoatThread(vessel.id, `${vessel.name} Crew`, userId)
     await this.prisma.user.update({ where: { id: userId }, data: { currentVesselId: vessel.id } })
     return vessel
   }
@@ -123,11 +126,13 @@ export class VesselsService {
 
   async addCrew(actorId: string, vesselId: string, input: AddCrewInput) {
     await this.ensureCanManageCrew(actorId, vesselId)
-    return this.prisma.vesselMembership.upsert({
+    const membership = await this.prisma.vesselMembership.upsert({
       where: { vesselId_userId: { vesselId, userId: input.userId } },
       create: { vesselId, userId: input.userId, role: input.role ?? 'guest' },
       update: { role: input.role ?? 'guest' },
     })
+    await this.messaging.addBoatMember(vesselId, input.userId, input.role ?? 'guest')
+    return membership
   }
 
   async listInvitations(actorId: string, vesselId: string) {
@@ -185,7 +190,7 @@ export class VesselsService {
     if (invite.expiresAt && invite.expiresAt.getTime() < Date.now()) throw new BadRequestException('Invitation has expired')
     if (invite.vessel.deletedAt) throw new BadRequestException('Vessel is no longer available')
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const membership = await tx.vesselMembership.upsert({
         where: { vesselId_userId: { vesselId: invite.vesselId, userId } },
         create: { vesselId: invite.vesselId, userId, role: invite.role },
@@ -199,18 +204,20 @@ export class VesselsService {
       if (user && !user.currentVesselId) {
         await tx.user.update({ where: { id: userId }, data: { currentVesselId: invite.vesselId } })
       }
-      await this.notifications.notify({
-        userId: invite.vessel.ownerId,
-        vesselId: invite.vesselId,
-        sourceType: 'vessel_invitation',
-        sourceId: invite.id,
-        type: 'boat.invitation.claimed',
-        title: 'Crew joined boat',
-        body: `${userId} joined ${invite.vessel.name} as ${invite.role}.`,
-        payload: { userId, role: invite.role },
-      })
       return { vessel: invite.vessel, membership }
     })
+    await this.messaging.addBoatMember(invite.vesselId, userId, invite.role)
+    await this.notifications.notify({
+      userId: invite.vessel.ownerId,
+      vesselId: invite.vesselId,
+      sourceType: 'vessel_invitation',
+      sourceId: invite.id,
+      type: 'boat.invitation.claimed',
+      title: 'Crew joined boat',
+      body: `${userId} joined ${invite.vessel.name} as ${invite.role}.`,
+      payload: { userId, role: invite.role },
+    })
+    return result
   }
 
   async listSetupSteps(userId: string, vesselId: string) {

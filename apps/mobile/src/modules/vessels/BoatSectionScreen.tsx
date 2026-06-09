@@ -18,6 +18,7 @@ import {
 } from './api'
 import { completeService, createEquipment, listDueEquipment, listEquipment, type EquipmentItem } from './equipmentApi'
 import { createVesselManual, listVesselManuals, searchManuals, type ManualDocument } from './manualsApi'
+import { listChatMessages, listChatThreads, sendChatMessage, type ChatMessage, type ChatThread } from './messagingApi'
 import { adjustSupply, createSupply, listSupplies, type SupplyItem } from './suppliesApi'
 
 const labels: Record<string, string> = {
@@ -41,6 +42,7 @@ export function BoatSectionScreen() {
   if (section === 'equipment') return <EquipmentScreen />
   if (section === 'documents') return <ManualsScreen mode="documents" />
   if (section === 'manuals') return <ManualsScreen mode="manuals" />
+  if (section === 'crew') return <CrewChatScreen />
   if (section === 'join') return <JoinScreen />
   const title = labels[section] ?? 'Boat Module'
   return (
@@ -405,6 +407,74 @@ function ManualsScreen({ mode }: { mode: 'manuals' | 'documents' }) {
                   <Text style={styles.badge}>{item.offlinePriority}</Text>
                 </View>
                 {item.contentText && <Text style={styles.cardMeta}>{item.contentText}</Text>}
+              </View>
+            ))}
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    </LinearGradient>
+  )
+}
+
+function CrewChatScreen() {
+  const [thread, setThread] = useState<ChatThread | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [draft, setDraft] = useState('Crew check-in')
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function load() {
+    setLoading(true)
+    setError(null)
+    try {
+      const hud = await getCaptainHud()
+      const threads = await listChatThreads()
+      const current = threads.find((item) => item.vesselId === hud.currentVessel?.id) ?? threads[0] ?? null
+      setThread(current)
+      setMessages(current ? await listChatMessages(current.id) : [])
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load crew chat')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { void load() }, [])
+
+  async function send() {
+    if (!thread || !draft.trim()) return
+    setBusy(true)
+    try {
+      await sendChatMessage(thread.id, draft)
+      setDraft('')
+      await load()
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to send message')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <LinearGradient colors={[colors.skyBottom, '#ffffff']} style={styles.screen}>
+      <SafeAreaView style={styles.safe}>
+        <Header title="Crew" />
+        {loading ? <ActivityIndicator color={colors.accent} /> : (
+          <ScrollView contentContainerStyle={styles.content}>
+            {error && <Text style={styles.error}>{error}</Text>}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>{thread?.title ?? 'No boat chat yet'}</Text>
+              <Text style={styles.cardMeta}>{thread?.members?.length ?? 0} crew member(s)</Text>
+              <TextInput value={draft} onChangeText={setDraft} placeholder="Message crew" style={styles.input} />
+              <Pressable disabled={!thread || busy || !draft.trim()} style={[styles.primary, (!thread || busy || !draft.trim()) && styles.disabled]} onPress={send}>
+                <Text style={styles.primaryText}>Send</Text>
+              </Pressable>
+            </View>
+            {messages.map((message) => (
+              <View key={message.id} style={styles.card}>
+                <Text style={styles.cardTitle}>{message.body}</Text>
+                <Text style={styles.cardMeta}>{new Date(message.createdAt).toLocaleString()}</Text>
               </View>
             ))}
           </ScrollView>

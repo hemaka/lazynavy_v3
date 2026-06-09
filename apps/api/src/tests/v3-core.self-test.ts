@@ -31,6 +31,8 @@ async function main() {
   const createdEquipmentIds: string[] = []
   const createdMaintenanceIds: string[] = []
   const createdManualIds: string[] = []
+  const createdChatThreadIds: string[] = []
+  const createdChatMessageIds: string[] = []
   let app: INestApplication | null = null
 
   try {
@@ -61,6 +63,10 @@ async function main() {
     createdVesselIds.push(vessel.id)
     assert.equal(vessel.memberships[0].role, 'captain')
     assert.equal(vessel.setupSteps.length, 4)
+    const captainThreads = await get<Json[]>(`${baseUrl}/messages/threads?userId=${captain.id}`)
+    const boatThread = captainThreads.find((thread) => thread.vesselId === vessel.id)
+    assert.ok(boatThread)
+    createdChatThreadIds.push(boatThread.id)
 
     const roles = await get<Json[]>(`${baseUrl}/vessels/roles`)
     assert.ok(roles.some((role) => role.key === 'captain'))
@@ -83,6 +89,12 @@ async function main() {
     const joined = await post<Json>(`${baseUrl}/vessels/join?userId=${crew.id}`, { code: invite.code })
     assert.equal(joined.vessel.id, vessel.id)
     assert.equal(joined.membership.role, 'crew')
+    const crewThreads = await get<Json[]>(`${baseUrl}/messages/threads?userId=${crew.id}`)
+    assert.ok(crewThreads.some((thread) => thread.id === boatThread.id))
+    const chatMessage = await post<Json>(`${baseUrl}/messages/threads/${boatThread.id}/messages?userId=${crew.id}`, { body: 'Selftest crew onboard' })
+    createdChatMessageIds.push(chatMessage.id)
+    const chatMessages = await get<Json[]>(`${baseUrl}/messages/threads/${boatThread.id}?userId=${captain.id}`)
+    assert.ok(chatMessages.some((message) => message.id === chatMessage.id))
 
     const setupSteps = await get<Json[]>(`${baseUrl}/vessels/${vessel.id}/setup-steps?userId=${captain.id}`)
     assert.equal(setupSteps.length, 4)
@@ -333,6 +345,9 @@ async function main() {
       await prisma.voyage.deleteMany({ where: { id: { in: createdVoyageIds } } })
       await prisma.vesselInvitation.deleteMany({ where: { id: { in: createdInvitationIds } } })
       await prisma.vesselSetupStep.deleteMany({ where: { vesselId: { in: createdVesselIds } } })
+      await prisma.chatMessage.deleteMany({ where: { id: { in: createdChatMessageIds } } })
+      await prisma.chatMember.deleteMany({ where: { threadId: { in: createdChatThreadIds } } })
+      await prisma.chatThread.deleteMany({ where: { id: { in: createdChatThreadIds } } })
       await prisma.vesselMembership.deleteMany({ where: { OR: [{ userId: { in: createdUserIds } }, { vesselId: { in: createdVesselIds } }] } })
       await prisma.vessel.deleteMany({ where: { id: { in: createdVesselIds } } })
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } })

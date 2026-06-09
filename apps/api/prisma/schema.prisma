@@ -30,6 +30,8 @@ model User {
   rewardLedger RewardLedger[]
   manuals      ManualDocument[]
   notifications Notification[]
+  chatMembers  ChatMember[]
+  chatMessages ChatMessage[]
 }
 
 model Vessel {
@@ -63,6 +65,7 @@ model Vessel {
   supplies     SupplyItem[]
   equipment    Equipment[]
   manuals      ManualDocument[]
+  chatThreads  ChatThread[]
   discoveryUnlocks DiscoveryUnlock[]
   rewardLedger RewardLedger[]
 
@@ -452,6 +455,52 @@ model Notification {
   @@unique([userId, sourceType, sourceId, type])
   @@index([userId, status, createdAt])
   @@index([vesselId, createdAt])
+}
+
+model ChatThread {
+  id        String   @id @default(uuid())
+  vesselId  String?
+  type      String   @default("boat")
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vessel   Vessel? @relation(fields: [vesselId], references: [id])
+  members  ChatMember[]
+  messages ChatMessage[]
+
+  @@unique([vesselId, type])
+  @@index([type, updatedAt])
+}
+
+model ChatMember {
+  id        String   @id @default(uuid())
+  threadId  String
+  userId    String
+  role      String   @default("member")
+  status    String   @default("active")
+  joinedAt  DateTime @default(now())
+
+  thread ChatThread @relation(fields: [threadId], references: [id])
+  user   User       @relation(fields: [userId], references: [id])
+
+  @@unique([threadId, userId])
+  @@index([userId, status])
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  threadId  String
+  senderId  String
+  body      String
+  kind      String   @default("text")
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  thread ChatThread @relation(fields: [threadId], references: [id])
+  sender User       @relation(fields: [senderId], references: [id])
+
+  @@index([threadId, createdAt])
 }
 
 model RewardRule {
