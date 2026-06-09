@@ -9,6 +9,12 @@ datasource db {
 model User {
   id              String   @id @default(uuid())
   nickname        String
+  accountKind     String   @default("normal")
+  internalEmail   String?  @unique
+  managedById     String?
+  birthYear       Int?
+  guardianName    String?
+  claimedAt       DateTime?
   avatarUrl       String?
   title           String   @default("Harbor Rookie")
   level           Int      @default(1)
@@ -32,6 +38,11 @@ model User {
   notifications Notification[]
   chatMembers  ChatMember[]
   chatMessages ChatMessage[]
+
+  manager      User?  @relation("ManagedAccounts", fields: [managedById], references: [id])
+  managedUsers User[] @relation("ManagedAccounts")
+
+  @@index([managedById, accountKind])
 }
 
 model Vessel {

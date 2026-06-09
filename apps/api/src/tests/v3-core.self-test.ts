@@ -136,6 +136,17 @@ async function main() {
     await post<Json>(`${baseUrl}/vessels/${vessel.id}/crew?userId=${captain.id}`, { userId: crew.id, role: 'navigator' })
     await patch<Json>(`${baseUrl}/vessels/${vessel.id}/current?userId=${captain.id}`, {})
 
+    const managedChild = await post<Json>(`${baseUrl}/identity/managed-accounts?userId=${captain.id}`, {
+      nickname: `Selftest Child ${suffix}`,
+      birthYear: 2016,
+      guardianName: 'Selftest Guardian',
+    })
+    createdUserIds.push(managedChild.id)
+    assert.equal(managedChild.accountKind, 'managed')
+    assert.ok(managedChild.internalEmail.endsWith('@managed.lazynavy.local'))
+    const managedAccounts = await get<Json[]>(`${baseUrl}/identity/managed-accounts?userId=${captain.id}`)
+    assert.ok(managedAccounts.some((item) => item.id === managedChild.id))
+
     console.log('v3-core selftest: create voyage')
     const voyage = await post<Json>(`${baseUrl}/voyages?userId=${captain.id}`, {
       vesselId: vessel.id,
@@ -143,11 +154,15 @@ async function main() {
       departureName: 'Test Marina',
       destinationName: 'Blue Point',
       needsConfirmation: true,
-      participantUserIds: [crew.id],
+      participantUserIds: [crew.id, managedChild.id],
+      managedParticipants: [{ nickname: `Selftest Guest ${suffix}`, role: 'passenger' }],
     })
     createdVoyageIds.push(voyage.id)
     assert.equal(voyage.needsConfirmation, true)
-    assert.equal(voyage.participants.length, 2)
+    assert.equal(voyage.participants.length, 4)
+    const managedGuestParticipant = (voyage.participants as Json[]).find((participant) => participant.role === 'passenger')
+    assert.ok(managedGuestParticipant)
+    createdUserIds.push(managedGuestParticipant.userId)
 
     const hudWithVoyage = await get<Json>(`${baseUrl}/home/captain-hud?userId=${captain.id}`)
     assert.equal(hudWithVoyage.currentVessel.id, vessel.id)
@@ -159,7 +174,8 @@ async function main() {
       contentText: 'Crew liability waiver accepted for this voyage.',
     })
     createdManualIds.push(waiver.id)
-    const voyageDocuments = await get<Json[]>(`${baseUrl}/voyages/${voyage.id}/documents?userId=${crew.id}`)
+    await assertRejectsStatus(() => get<Json[]>(`${baseUrl}/voyages/${voyage.id}/documents?userId=${crew.id}`), 'Voyage documents are restricted')
+    const voyageDocuments = await get<Json[]>(`${baseUrl}/voyages/${voyage.id}/documents?userId=${captain.id}`)
     assert.ok(voyageDocuments.some((item) => item.id === waiver.id))
 
     console.log('v3-core selftest: complete voyage')

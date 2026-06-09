@@ -1,9 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
+import { Prisma, type User } from '@prisma/client'
 import { PrismaService } from '../../prisma/prisma.service'
 import { NotificationsService } from '../notifications/notifications.service'
 import { RewardsService } from '../rewards/rewards.service'
 import { VesselsService } from '../vessels/vessels.service'
+import { IdentityService } from '../identity/identity.service'
 
 export interface CreateVoyageInput {
   vesselId: string
@@ -13,6 +14,7 @@ export interface CreateVoyageInput {
   plannedStartAt?: string
   needsConfirmation?: boolean
   participantUserIds?: string[]
+  managedParticipants?: Array<{ nickname: string; birthYear?: number; guardianName?: string; role?: string }>
 }
 
 export interface CreateVoyageDocumentInput {
@@ -35,6 +37,7 @@ export class VoyagesService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly rewards: RewardsService,
+    private readonly identity: IdentityService,
     private readonly vessels: VesselsService,
   ) {}
 
@@ -62,6 +65,15 @@ export class VoyagesService {
   async createPlan(userId: string, input: CreateVoyageInput) {
     if (!input.name?.trim()) throw new BadRequestException('Voyage name is required')
     await this.vessels.ensureUserVessel(userId, input.vesselId)
+    const managedParticipantUsers: User[] = []
+    for (const participant of input.managedParticipants ?? []) {
+      managedParticipantUsers.push(await this.identity.createManagedAccount(userId, participant))
+    }
+    const participantUserIds = unique([userId, ...(input.participantUserIds ?? []), ...managedParticipantUsers.map((user) => user.id)])
+    const existingManagedParticipantIds = new Set((await this.prisma.user.findMany({
+      where: { id: { in: participantUserIds }, accountKind: 'managed' },
+      select: { id: true },
+    })).map((user) => user.id))
     const voyage = await this.prisma.voyage.create({
       data: {
         ownerId: userId,
@@ -72,12 +84,17 @@ export class VoyagesService {
         plannedStartAt: input.plannedStartAt ? new Date(input.plannedStartAt) : null,
         needsConfirmation: input.needsConfirmation ?? false,
         participants: {
-          create: unique([userId, ...(input.participantUserIds ?? [])]).map((participantUserId) => ({
-            userId: participantUserId,
-            role: participantUserId === userId ? 'captain' : 'crew',
-            status: participantUserId === userId ? 'confirmed' : 'invited',
-            confirmedAt: participantUserId === userId ? new Date() : null,
-          })),
+          create: participantUserIds.map((participantUserId) => {
+            const managedParticipant = managedParticipantUsers.find((user) => user.id === participantUserId)
+            const requestedRole = input.managedParticipants?.find((participant) => participant.nickname === managedParticipant?.nickname)?.role
+            const isManaged = managedParticipant?.accountKind === 'managed' || existingManagedParticipantIds.has(participantUserId)
+            return {
+              userId: participantUserId,
+              role: participantUserId === userId ? 'captain' : requestedRole ?? 'crew',
+              status: participantUserId === userId || isManaged ? 'confirmed' : 'invited',
+              confirmedAt: participantUserId === userId || isManaged ? new Date() : null,
+            }
+          }),
         },
         auditEvents: {
           create: { actorId: userId, type: 'voyage.created', payload: compactJson({ vesselId: input.vesselId }) },
@@ -160,7 +177,7 @@ export class VoyagesService {
   }
 
   async listDocuments(userId: string, voyageId: string) {
-    await this.ensureVoyageAccess(userId, voyageId)
+    await this.ensureVoyageSensitiveDocumentAccess(userId, voyageId)
     return this.prisma.manualDocument.findMany({
       where: { voyageId, deletedAt: null },
       orderBy: { updatedAt: 'desc' },
@@ -168,7 +185,7 @@ export class VoyagesService {
   }
 
   async createDocument(userId: string, voyageId: string, input: CreateVoyageDocumentInput) {
-    const voyage = await this.ensureVoyageAccess(userId, voyageId)
+    const voyage = await this.ensureVoyageSensitiveDocumentAccess(userId, voyageId)
     if (!input.title?.trim()) throw new BadRequestException('Document title is required')
     return this.prisma.manualDocument.create({
       data: {
@@ -220,6 +237,14 @@ export class VoyagesService {
     const voyage = await this.prisma.voyage.findFirst({ where: { id: voyageId, ownerId: userId } })
     if (!voyage) throw new ForbiddenException('Voyage not found or not owned')
     return voyage
+  }
+
+  private async ensureVoyageSensitiveDocumentAccess(userId: string, voyageId: string) {
+    const voyage = await this.ensureVoyageAccess(userId, voyageId)
+    if (voyage.ownerId === userId) return voyage
+    const participant = voyage.participants.find((item) => item.userId === userId)
+    if (participant?.role === 'captain') return voyage
+    throw new ForbiddenException('Voyage documents are restricted to owner or captain')
   }
 
   private addAudit(voyageId: string, actorId: string, type: string, payload: Prisma.InputJsonObject) {
