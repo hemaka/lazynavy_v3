@@ -6,8 +6,18 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRole {
+  CREW
+  CAPTAIN
+  OWNER
+  MERCHANT
+}
+
 model User {
   id              String   @id @default(uuid())
+  phone           String?  @unique
+  email           String?  @unique
+  passwordHash    String?
   nickname        String
   accountKind     String   @default("normal")
   internalEmail   String?  @unique
@@ -15,7 +25,20 @@ model User {
   birthYear       Int?
   guardianName    String?
   claimedAt       DateTime?
+  avatar          String?
   avatarUrl       String?
+  coverImage      String?
+  bio             String?
+  region          String?
+  country         String?
+  firstLanguage   String?
+  currency        String?
+  timezone        String?
+  textLanguage    String?
+  uiLanguage      String?
+  gender          String   @default("private")
+  birthDate       DateTime?
+  sailingYears    Int?
   title           String   @default("Harbor Rookie")
   level           Int      @default(1)
   xp              Int      @default(0)
@@ -23,7 +46,12 @@ model User {
   availableMileagePoints Int @default(0)
   pendingMileagePoints   Int @default(0)
   tokenVersion    Int      @default(0)
+  roles           UserRole[] @default([])
+  verifiedRoles   UserRole[] @default([])
+  isPublic        Boolean  @default(true)
+  locationPolicy  String   @default("region")
   currentVesselId String?
+  deletedAt       DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

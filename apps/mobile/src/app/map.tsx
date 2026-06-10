@@ -1,1 +1,1 @@
-export { MapScreen as default } from '../modules/map/MapScreen'
+export { default } from '../modules/places/screens/MapScreen'

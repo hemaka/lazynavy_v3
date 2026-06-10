@@ -15,6 +15,13 @@ config.resolver.unstable_enableSymlinks = true
 
 const defaultResolveRequest = config.resolver.resolveRequest
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (platform === 'web' && moduleName === 'react-native-maps') {
+    return {
+      filePath: path.resolve(projectRoot, 'src/shims/react-native-maps.web.tsx'),
+      type: 'sourceFile',
+    }
+  }
+
   if (platform === 'web' && moduleName === 'expo-sqlite') {
     return {
       filePath: path.resolve(projectRoot, 'src/shims/expo-sqlite.web.ts'),

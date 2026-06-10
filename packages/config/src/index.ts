@@ -4,10 +4,10 @@ export const V3_DATABASE_NAME = 'lazynavy_v3'
 export const MAX_HOME_SHORTCUTS = 6
 
 export const V3_BOTTOM_NAV = [
-  { key: 'voyage', label: 'Voyage', href: '/voyage', icon: 'route' },
+  { key: 'home', label: '首页', href: '/', icon: 'home' },
   { key: 'map', label: 'Map', href: '/map', icon: 'map' },
   { key: 'log', label: 'Log', href: '/log', icon: 'book' },
-  { key: 'toolbox', label: 'Toolbox', href: '/toolbox', icon: 'wrench' },
+  { key: 'profile', label: '我的', href: '/profile', icon: 'user' },
 ] as const
 
 export const V3_BOAT_RADIAL_MENU = [

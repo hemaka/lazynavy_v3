@@ -55,4 +55,93 @@ const B001_INIT_BUSINESS: Migration = {
   `,
 }
 
+const S001_INIT_POIS: Migration = {
+  id: 1,
+  name: 'init_pois',
+  sql: `
+    CREATE TABLE IF NOT EXISTS pois (
+      id TEXT PRIMARY KEY,
+      version INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      category_group TEXT NOT NULL,
+      subtype TEXT,
+      lat REAL NOT NULL,
+      lng REAL NOT NULL,
+      country TEXT,
+      region TEXT,
+      address TEXT,
+      phone TEXT,
+      description TEXT,
+      timezone TEXT,
+      max_length REAL,
+      max_draft REAL,
+      max_beam REAL,
+      multihull_friendly INTEGER,
+      has_water INTEGER,
+      has_power INTEGER,
+      has_fuel INTEGER,
+      has_repair INTEGER,
+      has_waste_disposal INTEGER,
+      stay_limit TEXT,
+      fee_info TEXT,
+      bookable INTEGER,
+      overnight_allowed INTEGER,
+      berthing_types TEXT,
+      seabeds TEXT,
+      protections TEXT,
+      mooring_types TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_pois_geo ON pois(lat, lng);
+    CREATE INDEX IF NOT EXISTS idx_pois_category ON pois(category);
+    CREATE INDEX IF NOT EXISTS idx_pois_subtype ON pois(subtype);
+    CREATE INDEX IF NOT EXISTS idx_pois_country ON pois(country);
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS pois_fts USING fts5(
+      id UNINDEXED,
+      name,
+      description,
+      country,
+      region,
+      address
+    );
+
+    CREATE TRIGGER IF NOT EXISTS pois_ai AFTER INSERT ON pois BEGIN
+      INSERT INTO pois_fts(id, name, description, country, region, address)
+      VALUES (new.id, new.name, COALESCE(new.description, ''), COALESCE(new.country, ''), COALESCE(new.region, ''), COALESCE(new.address, ''));
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS pois_au AFTER UPDATE ON pois BEGIN
+      UPDATE pois_fts SET
+        name = new.name,
+        description = COALESCE(new.description, ''),
+        country = COALESCE(new.country, ''),
+        region = COALESCE(new.region, ''),
+        address = COALESCE(new.address, '')
+      WHERE id = new.id;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS pois_ad AFTER DELETE ON pois BEGIN
+      DELETE FROM pois_fts WHERE id = old.id;
+    END;
+  `,
+}
+
+const S002_POI_DETAIL_CACHE: Migration = {
+  id: 2,
+  name: 'poi_detail_cache',
+  sql: `
+    CREATE TABLE IF NOT EXISTS poi_detail_cache (
+      id TEXT PRIMARY KEY,
+      version INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      detail_json TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_poi_detail_cache_updated ON poi_detail_cache(updated_at);
+  `,
+}
+
+export const SHARED_MIGRATIONS: Migration[] = [S001_INIT_POIS, S002_POI_DETAIL_CACHE]
 export const BUSINESS_MIGRATIONS: Migration[] = [B001_INIT_BUSINESS]

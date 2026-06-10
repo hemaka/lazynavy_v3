@@ -15,12 +15,13 @@ import type { CaptainHudResponse } from '@lazynavy-v3/types'
 import { bottomNav } from '../../navigation/navConfig'
 import { IconGlyph } from '../../shared/ui/IconGlyph'
 import { colors } from '../../theme/tokens'
+import { useChatOverlay } from '../messages/ChatOverlay'
 import { createVessel, getCaptainHud } from './api'
 import { fallbackHud } from './fallbackHud'
 
 const { width, height } = Dimensions.get('window')
-const hudBackgroundWidth = height * (2428 / 2250)
-const hudBackground = require('../../assets/hud_bg_1.png')
+const hudBackground = require('../../assets/hud_bg_2.png')
+const hudBackgroundWidth = height * (2250 / 1500)
 
 export function HomeCaptainHudScreen() {
   const insets = useSafeAreaInsets()
@@ -28,6 +29,7 @@ export function HomeCaptainHudScreen() {
   const [loading, setLoading] = useState(false)
   const [emptyPreview, setEmptyPreview] = useState(false)
   const [crewSheetOpen, setCrewSheetOpen] = useState(false)
+  const chatOverlay = useChatOverlay()
 
   useEffect(() => {
     let cancelled = false
@@ -96,8 +98,8 @@ export function HomeCaptainHudScreen() {
           </View>
         )}
         {hud.user && (
-          <Pressable style={[styles.messageButton, { top: topArea + 20 }]} onPress={() => router.push('/boat/crew')}>
-            <Text style={styles.messageIcon}>▱</Text>
+          <Pressable style={[styles.messageButton, { top: topArea + 4 }]} onPress={chatOverlay.openChat}>
+            <Text style={styles.messageIcon}>✉</Text>
             <View style={styles.messageDot} />
           </Pressable>
         )}
@@ -161,9 +163,13 @@ export function HomeCaptainHudScreen() {
         )}
 
         <View style={[styles.bottomNav, { bottom: navBottom }]}>
-          {bottomNav.slice(0, 3).map((item) => (
-            <Pressable key={item.key} style={styles.navItem} onPress={() => router.push(item.href as never)}>
-              <IconGlyph name={item.icon} color={colors.accent} size={26}/>
+          {bottomNav.map((item, index) => (
+            <Pressable
+              key={item.key}
+              style={[styles.navItem, index === bottomNav.length - 1 && styles.navItemLast]}
+              onPress={() => router.push(item.href as never)}
+            >
+              <IconGlyph name={item.icon} color={colors.accent} size={24}/>
               <Text style={styles.navText}>{item.label}</Text>
             </Pressable>
           ))}
@@ -183,8 +189,9 @@ function Shortcut({ item }: { item: { href: string; icon: string; label: string 
 
 function CrewSheet({ hud, bottomOffset, onClose }: { hud: CaptainHudResponse; bottomOffset: number; onClose: () => void }) {
   const isCaptain = hud.currentVessel?.userRole === 'captain'
-  const captainName = hud.user?.nickname ?? 'Captain'
-  const otherCrewCount = Math.max((hud.currentVessel?.crewCount ?? 1) - 1, 0)
+  const captainName = isCaptain ? (hud.user?.nickname ?? 'Captain') : 'Captain'
+  const crewCount = hud.currentVessel?.crewCount ?? 1
+  const otherCrewCount = isCaptain ? Math.max(crewCount - 1, 0) : Math.max(crewCount - 2, 0)
 
   return (
     <View style={styles.crewSheetLayer}>
@@ -199,19 +206,21 @@ function CrewSheet({ hud, bottomOffset, onClose }: { hud: CaptainHudResponse; bo
           <View style={styles.memberAvatar}><Text style={styles.memberAvatarText}>{captainName.slice(0, 1)}</Text></View>
           <View style={styles.memberMain}>
             <Text numberOfLines={1} style={styles.memberName}>{captainName}</Text>
-            <Text style={styles.memberRole}>Captain</Text>
+            <Text style={styles.memberRole}>{isCaptain ? 'Captain · 我自己' : 'Captain'}</Text>
           </View>
         </View>
-        <View style={styles.memberRow}>
-          <View style={styles.memberAvatarAlt}><Text style={styles.memberAvatarText}>Y</Text></View>
-          <View style={styles.memberMain}>
-            <Text numberOfLines={1} style={styles.memberName}>You</Text>
-            <Text style={styles.memberRole}>{roleLabel(hud.currentVessel?.userRole ?? 'guest')}</Text>
+        {!isCaptain && (
+          <View style={styles.memberRow}>
+            <View style={styles.memberAvatarAlt}><Text style={styles.memberAvatarText}>Y</Text></View>
+            <View style={styles.memberMain}>
+              <Text numberOfLines={1} style={styles.memberName}>You</Text>
+              <Text style={styles.memberRole}>{roleLabel(hud.currentVessel?.userRole ?? 'guest')}</Text>
+            </View>
           </View>
-        </View>
-        {otherCrewCount > 1 && (
+        )}
+        {otherCrewCount > 0 && (
           <View style={styles.memberRowMuted}>
-            <Text style={styles.memberMutedText}>{otherCrewCount - 1} more crew member(s)</Text>
+            <Text style={styles.memberMutedText}>{otherCrewCount} more crew member(s)</Text>
           </View>
         )}
         {isCaptain && (
@@ -312,7 +321,7 @@ const styles = StyleSheet.create({
   previewToggle: { width: 54, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,119,182,0.1)' },
   previewText: { color: colors.accent, fontWeight: '900', fontSize: 11 },
   messageButton: { position: 'absolute', right: 12, top: 38, width: 40, height: 40, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.28)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.76)', alignItems: 'center', justifyContent: 'center' },
-  messageIcon: { color: colors.white, fontSize: 30, fontWeight: '900', transform: [{ rotate: '90deg' }] },
+  messageIcon: { color: colors.white, fontSize: 24, fontWeight: '900' },
   messageDot: { position: 'absolute', right: -6, top: -6, width: 16, height: 16, borderRadius: 8, backgroundColor: '#ff4b3e', borderWidth: 2, borderColor: colors.white },
   vesselInfoCard: { minWidth: 244, maxWidth: width - 72, minHeight: 58, paddingLeft: 8, paddingRight: 8, paddingVertical: 7, borderRadius: 20, backgroundColor: 'rgba(244,252,255,0.82)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', flexDirection: 'row', alignItems: 'center', gap: 9, shadowColor: '#075985', shadowOpacity: 0.14, shadowRadius: 14, shadowOffset: { width: 0, height: 7 } },
   vesselPhoto: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(0,139,165,0.16)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.86)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
@@ -385,5 +394,6 @@ const styles = StyleSheet.create({
   secondaryText: { color: colors.accent, fontWeight: '900' },
   bottomNav: { position: 'absolute', left: 12, right: 12, bottom: 18, height: 58, borderRadius: 16, backgroundColor: 'rgba(244,252,255,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.88)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', shadowColor: '#075985', shadowOpacity: 0.14, shadowRadius: 14, shadowOffset: { width: 0, height: 8 } },
   navItem: { flex: 1, height: 48, alignItems: 'center', justifyContent: 'center', gap: 2, borderRightWidth: 1, borderRightColor: 'rgba(14,116,144,0.12)' },
-  navText: { color: colors.ink, fontSize: 12, fontWeight: '600' },
+  navItemLast: { borderRightWidth: 0 },
+  navText: { color: colors.ink, fontSize: 10, fontWeight: '600' },
 })

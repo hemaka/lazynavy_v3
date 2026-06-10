@@ -78,3 +78,110 @@ export interface CaptainHudResponse {
   weather: EnvironmentChip[]
   shortcuts: HudShortcut[]
 }
+
+export interface Location {
+  lat: number
+  lng: number
+}
+
+export type PoiCategoryGroup = 'berthing' | 'service' | 'hazard' | 'other'
+
+export type PoiCategory =
+  | 'marina'
+  | 'anchorage'
+  | 'dry_dock'
+  | 'buoy_mooring'
+  | 'public_quay'
+  | 'hazard'
+  | 'other'
+
+export type PoiStatus =
+  | 'draft'
+  | 'pending_review'
+  | 'active'
+  | 'temporarily_closed'
+  | 'restricted'
+  | 'archived'
+
+export type PoiNoteType = 'info' | 'caution' | 'warning' | 'restriction'
+export type PoiNoteStatus = 'draft' | 'pending_review' | 'published' | 'highlighted' | 'rejected' | 'archived'
+
+export interface PoiReview {
+  id: string
+  poiId: string
+  userId: string
+  rating: number
+  comment?: string
+  createdAt: string
+  updatedAt: string
+  user?: { id: string; nickname: string; avatar?: string | null }
+}
+
+export interface PoiNote {
+  id: string
+  status: PoiNoteStatus
+  noteType: PoiNoteType
+  text: string
+  isPinned: boolean
+  isConfirmed: boolean
+  confirmedAt?: string
+  confirmedBy?: string
+  createdAt: string
+  updatedAt: string
+  createdBy?: string
+  createdByRole?: string
+}
+
+export interface POI {
+  id: string
+  version: number
+  name: string
+  category: PoiCategory
+  categoryGroup: PoiCategoryGroup
+  subtype: PoiCategory
+  status: PoiStatus
+  kind: string
+  type: string
+  slug: string
+  location: Location
+  region?: string
+  country?: string
+  address?: string
+  description?: string
+  rating?: number
+  commentsCount: number
+  phone?: string
+  sourceUrl?: string
+  picture?: string
+  timezone?: string
+  maxDraft?: number
+  maxLength?: number
+  maxBeam?: number
+  bookable?: boolean
+  overnightAllowed?: boolean
+  stayLimit?: string
+  feeInfo?: string
+  multihullFriendly?: boolean
+  seabeds: string[]
+  protections: string[]
+  berthingTypes: string[]
+  mooringTypes: string[]
+  bestMonths: number[]
+  hasWater?: boolean
+  hasPower?: boolean
+  hasFuel?: boolean
+  hasRepair?: boolean
+  hasWasteDisposal?: boolean
+  notes: PoiNote[]
+  warningNotes: PoiNote[]
+  photos: string[]
+}
+
+export interface PoiRegionSummary {
+  id: string
+  location: Location
+  count: number
+  topCategory: PoiCategory
+  categories: Partial<Record<PoiCategory, number>>
+  region?: string
+}

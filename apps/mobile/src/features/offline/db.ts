@@ -1,5 +1,29 @@
 import * as SQLite from 'expo-sqlite'
-import { BUSINESS_MIGRATIONS, runMigrations } from './migrations'
+import { BUSINESS_MIGRATIONS, SHARED_MIGRATIONS, runMigrations } from './migrations'
+
+let sharedDb: SQLite.SQLiteDatabase | null = null
+let sharedDbReady: Promise<SQLite.SQLiteDatabase> | null = null
+
+export function getSharedDb(): Promise<SQLite.SQLiteDatabase> {
+  if (sharedDb) return Promise.resolve(sharedDb)
+  if (!sharedDbReady) {
+    sharedDbReady = (async () => {
+      const db = await SQLite.openDatabaseAsync('lazynavy-v3-shared.db')
+      await db.execAsync(`PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;`)
+      await runMigrations(db, SHARED_MIGRATIONS, 'shared')
+      sharedDb = db
+      return db
+    })()
+  }
+  return sharedDbReady
+}
+
+export async function closeSharedDb(): Promise<void> {
+  if (!sharedDb) return
+  await sharedDb.closeAsync()
+  sharedDb = null
+  sharedDbReady = null
+}
 
 const businessDbs = new Map<string, SQLite.SQLiteDatabase>()
 const businessDbReady = new Map<string, Promise<SQLite.SQLiteDatabase>>()

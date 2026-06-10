@@ -5,10 +5,20 @@
     "scheme": "lazynavyv3",
     "version": "0.0.1",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "ios": {
-      "bundleIdentifier": "com.anonymous.lazynavy-v3"
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.lazynavy-v3",
+      "appleTeamId": "N2UQHXDELE"
+    },
+    "android": {
+      "package": "com.anonymous.lazynavyv3",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#071d36"
+      }
     }
   }
 }

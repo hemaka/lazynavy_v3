@@ -1,6 +1,7 @@
 import { Text, type TextStyle } from 'react-native'
 
 const glyphs: Record<string, string> = {
+  home: '⌂',
   route: '◢',
   map: '⌖',
   book: '▤',
@@ -11,6 +12,8 @@ const glyphs: Record<string, string> = {
   file: '☑',
   layout: '□',
   camera: '◉',
+  user: '◎',
+  message: '✉',
 }
 
 export function IconGlyph({ name, color = '#123047', size = 18, style }: { name: string; color?: string; size?: number; style?: TextStyle }) {
