@@ -2,6 +2,8 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../../../prisma/prisma.service'
 import { UpdateProfileDto } from './dto/update-profile.dto'
 
+const DEFAULT_ACTIVE_BADGE_ID = '01_beginner'
+
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
@@ -54,7 +56,7 @@ export class UsersService {
   async create(data: { nickname: string; email?: string | null; phone?: string | null; passwordHash: string }) {
     const user = await this.prisma.user.create({ data })
     await this.ensureDefaultBadges(user.id)
-    return user
+    return this.ensureDefaultActiveBadge(user.id)
   }
 
   async updateProfile(id: string, dto: UpdateProfileDto) {
@@ -180,6 +182,29 @@ export class UsersService {
         source: 'system',
       })),
       skipDuplicates: true,
+    })
+    await this.ensureDefaultActiveBadge(userId)
+  }
+
+  private async ensureDefaultActiveBadge(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { activeBadgeId: true },
+    })
+    if (user?.activeBadgeId) return this.prisma.user.findUniqueOrThrow({ where: { id: userId } })
+    const beginnerBadge = await this.prisma.userBadge.findFirst({
+      where: {
+        userId,
+        badgeId: DEFAULT_ACTIVE_BADGE_ID,
+        status: 'available',
+        badge: { status: 'active' },
+      },
+      select: { id: true },
+    })
+    if (!beginnerBadge) return this.prisma.user.findUniqueOrThrow({ where: { id: userId } })
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { activeBadgeId: DEFAULT_ACTIVE_BADGE_ID },
     })
   }
 
