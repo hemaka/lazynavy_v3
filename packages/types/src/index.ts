@@ -1,5 +1,7 @@
 export type Id = string
 
+export * from './inventory/template'
+
 export type BoatSceneTemplateKey =
   | 'empty_sea'
   | 'open_sea'
