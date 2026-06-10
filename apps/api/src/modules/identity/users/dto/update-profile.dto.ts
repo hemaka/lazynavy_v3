@@ -83,4 +83,11 @@ export class UpdateProfileDto {
   @IsString()
   @MaxLength(80)
   currentVesselId?: string | null
+
+  // null 表示清空当前展示徽章，字符串表示设置为已启用徽章 id
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(80)
+  activeBadgeId?: string | null
 }

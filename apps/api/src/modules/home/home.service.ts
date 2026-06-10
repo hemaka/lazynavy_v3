@@ -53,6 +53,7 @@ export class HomeService {
         nextLevelXp: user.nextLevelXp,
         availableMileagePoints: user.availableMileagePoints,
         pendingMileagePoints: user.pendingMileagePoints,
+        activeBadgeId: user.activeBadgeId,
         currentVesselId: user.currentVesselId,
       },
       currentVessel: currentSummary,

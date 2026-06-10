@@ -31,6 +31,7 @@ export interface AuthUser {
   nextLevelXp?: number
   availableMileagePoints?: number
   pendingMileagePoints?: number
+  activeBadgeId?: string | null
   roles?: UserRole[]
   verifiedRoles?: UserRole[]
   isPublic?: boolean

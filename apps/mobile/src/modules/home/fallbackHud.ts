@@ -10,6 +10,7 @@ export const fallbackHud: CaptainHudResponse = {
     nextLevelXp: 120,
     availableMileagePoints: 0,
     pendingMileagePoints: 20,
+    activeBadgeId: '01_beginner',
     currentVesselId: 'local-vessel',
   },
   currentVessel: {

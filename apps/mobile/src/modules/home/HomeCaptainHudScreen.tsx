@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { CaptainHudResponse } from '@lazynavy-v3/types'
 import { IconGlyph } from '../../shared/ui/IconGlyph'
 import { colors } from '../../theme/tokens'
+import { findBadge } from '../identity/badges/catalog'
 import { useChatOverlay } from '../messages/ChatOverlay'
 import { createVessel, getCaptainHud } from './api'
 import { fallbackHud } from './fallbackHud'
@@ -72,6 +73,7 @@ export function HomeCaptainHudScreen() {
   const weatherTop = topArea + 76
   const sideButtonTop = topArea + 176
   const alertBottom = bottomArea + 74
+  const activeBadge = findBadge(hud.user?.activeBadgeId)
 
   return (
     <View style={styles.screen}>
@@ -88,7 +90,13 @@ export function HomeCaptainHudScreen() {
               </View>
               <Text style={styles.xpText}>Lv. {hud.user.level} · {hud.user.xp.toLocaleString()} / {hud.user.nextLevelXp.toLocaleString()} XP</Text>
             </View>
-            <View style={styles.playerBadge}><Text style={styles.playerBadgeIcon}>✓</Text></View>
+            <View style={styles.playerBadge}>
+              {activeBadge ? (
+                <Image source={activeBadge.image} style={styles.playerBadgeImage} resizeMode="contain" />
+              ) : (
+                <Text style={styles.playerBadgeIcon}>✓</Text>
+              )}
+            </View>
           </View>
         )}
         {hud.user && (
@@ -305,7 +313,8 @@ const styles = StyleSheet.create({
   playerMain: { flex: 1 },
   playerRow: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 16 },
   playerName: { color: '#071735', fontSize: 13, fontWeight: '700', maxWidth: width * 0.56 },
-  playerBadge: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#008ba5', borderWidth: 1, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  playerBadge: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#008ba5', borderWidth: 1, borderColor: colors.white, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  playerBadgeImage: { width: 38, height: 38 },
   playerBadgeIcon: { color: colors.white, fontSize: 19, fontWeight: '900', lineHeight: 22 },
   xpText: { color: '#071735', fontSize: 9, fontWeight: '600', marginTop: 0 },
   previewToggle: { width: 54, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,119,182,0.1)' },

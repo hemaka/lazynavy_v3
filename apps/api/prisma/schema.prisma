@@ -14,120 +14,161 @@ enum UserRole {
 }
 
 model User {
-  id              String   @id @default(uuid())
-  phone           String?  @unique
-  email           String?  @unique
-  passwordHash    String?
-  nickname        String
-  accountKind     String   @default("normal")
-  internalEmail   String?  @unique
-  managedById     String?
-  birthYear       Int?
-  guardianName    String?
-  claimedAt       DateTime?
-  avatar          String?
-  avatarUrl       String?
-  coverImage      String?
-  bio             String?
-  region          String?
-  country         String?
-  firstLanguage   String?
-  currency        String?
-  timezone        String?
-  textLanguage    String?
-  uiLanguage      String?
-  gender          String   @default("private")
-  birthDate       DateTime?
-  sailingYears    Int?
-  title           String   @default("Harbor Rookie")
-  level           Int      @default(1)
-  xp              Int      @default(0)
-  nextLevelXp     Int      @default(120)
-  availableMileagePoints Int @default(0)
-  pendingMileagePoints   Int @default(0)
-  tokenVersion    Int      @default(0)
-  roles           UserRole[] @default([])
-  verifiedRoles   UserRole[] @default([])
-  isPublic        Boolean  @default(true)
-  locationPolicy  String   @default("region")
-  currentVesselId String?
-  deletedAt       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                     String     @id @default(uuid())
+  phone                  String?    @unique
+  email                  String?    @unique
+  passwordHash           String?
+  nickname               String
+  accountKind            String     @default("normal")
+  internalEmail          String?    @unique
+  managedById            String?
+  birthYear              Int?
+  guardianName           String?
+  claimedAt              DateTime?
+  avatar                 String?
+  avatarUrl              String?
+  coverImage             String?
+  bio                    String?
+  region                 String?
+  country                String?
+  firstLanguage          String?
+  currency               String?
+  timezone               String?
+  textLanguage           String?
+  uiLanguage             String?
+  gender                 String     @default("private")
+  birthDate              DateTime?
+  sailingYears           Int?
+  title                  String     @default("Harbor Rookie")
+  level                  Int        @default(1)
+  xp                     Int        @default(0)
+  nextLevelXp            Int        @default(120)
+  availableMileagePoints Int        @default(0)
+  pendingMileagePoints   Int        @default(0)
+  activeBadgeId          String?
+  tokenVersion           Int        @default(0)
+  roles                  UserRole[] @default([])
+  verifiedRoles          UserRole[] @default([])
+  isPublic               Boolean    @default(true)
+  locationPolicy         String     @default("region")
+  currentVesselId        String?
+  deletedAt              DateTime?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
 
-  vessels      Vessel[]          @relation("VesselOwner")
-  memberships  VesselMembership[]
+  vessels            Vessel[]            @relation("VesselOwner")
+  memberships        VesselMembership[]
   voyageParticipants VoyageParticipant[]
-  logEntries   LogEntry[]
-  discoveryUnlocks DiscoveryUnlock[]
-  poiConfirms  PoiConfirm[]
-  rewardLedger RewardLedger[]
-  manuals      ManualDocument[]
-  notifications Notification[]
-  chatMembers  ChatMember[]
-  chatMessages ChatMessage[]
+  logEntries         LogEntry[]
+  discoveryUnlocks   DiscoveryUnlock[]
+  poiConfirms        PoiConfirm[]
+  rewardLedger       RewardLedger[]
+  manuals            ManualDocument[]
+  notifications      Notification[]
+  chatMembers        ChatMember[]
+  chatMessages       ChatMessage[]
+  activeBadge        Badge?              @relation("UserActiveBadge", fields: [activeBadgeId], references: [id], onDelete: SetNull)
+  availableBadges    UserBadge[]
 
   manager      User?  @relation("ManagedAccounts", fields: [managedById], references: [id])
   managedUsers User[] @relation("ManagedAccounts")
 
+  @@index([activeBadgeId])
   @@index([managedById, accountKind])
 }
 
-model Vessel {
-  id            String   @id @default(uuid())
-  ownerId       String
-  modelId       String?
-  name          String
-  type          String?
-  homePort      String?
-  registeredName String?
-  buildYear     Int?
-  acquisitionYear Int?
-  title         String   @default("First Wake")
-  level         Int      @default(1)
-  xp            Int      @default(0)
-  nextLevelXp   Int      @default(180)
-  badgesJson    Json?
-  availableMileagePoints Int @default(0)
-  pendingMileagePoints   Int @default(0)
-  sceneTemplate String   @default("open_sea")
-  operationalStatus String @default("docked")
-  setupStatus   String   @default("started")
-  deletedAt     DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+model Badge {
+  id          String   @id
+  kind        String
+  status      String   @default("active")
+  title       String
+  description String?
+  imageKey    String?
+  sortOrder   Int      @default(0)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  owner        User               @relation("VesselOwner", fields: [ownerId], references: [id])
-  model        VesselModel?       @relation(fields: [modelId], references: [id])
-  memberships  VesselMembership[]
-  invitations  VesselInvitation[]
-  setupSteps   VesselSetupStep[]
-  voyages      Voyage[]
-  logEntries   LogEntry[]
-  supplies     SupplyItem[]
-  equipment    Equipment[]
-  manuals      ManualDocument[]
-  chatThreads  ChatThread[]
+  activeUsers User[]      @relation("UserActiveBadge")
+  userBadges  UserBadge[]
+
+  @@index([kind, status, sortOrder])
+}
+
+model UserBadge {
+  id        String    @id @default(uuid())
+  userId    String
+  badgeId   String
+  status    String    @default("available")
+  source    String    @default("system")
+  grantedAt DateTime  @default(now())
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId, status])
+  @@index([badgeId, status])
+}
+
+model Vessel {
+  id                     String    @id @default(uuid())
+  ownerId                String
+  modelId                String?
+  name                   String
+  type                   String?
+  homePort               String?
+  registeredName         String?
+  buildYear              Int?
+  acquisitionYear        Int?
+  title                  String    @default("First Wake")
+  level                  Int       @default(1)
+  xp                     Int       @default(0)
+  nextLevelXp            Int       @default(180)
+  badgesJson             Json?
+  availableMileagePoints Int       @default(0)
+  pendingMileagePoints   Int       @default(0)
+  sceneTemplate          String    @default("open_sea")
+  operationalStatus      String    @default("docked")
+  setupStatus            String    @default("started")
+  deletedAt              DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  owner            User               @relation("VesselOwner", fields: [ownerId], references: [id])
+  model            VesselModel?       @relation(fields: [modelId], references: [id])
+  memberships      VesselMembership[]
+  invitations      VesselInvitation[]
+  setupSteps       VesselSetupStep[]
+  voyages          Voyage[]
+  logEntries       LogEntry[]
+  supplies         SupplyItem[]
+  equipment        Equipment[]
+  manuals          ManualDocument[]
+  chatThreads      ChatThread[]
   discoveryUnlocks DiscoveryUnlock[]
-  rewardLedger RewardLedger[]
+  rewardLedger     RewardLedger[]
 
   @@index([ownerId, deletedAt])
   @@index([modelId])
 }
 
 model VesselModel {
-  id          String   @id @default(uuid())
-  brand       String
-  model       String
-  type        String?
-  lengthFt    Float?
-  yearStart   Int?
-  yearEnd     Int?
-  specsJson   Json?
+  id                    String   @id @default(uuid())
+  brand                 String
+  model                 String
+  type                  String?
+  lengthFt              Float?
+  yearStart             Int?
+  yearEnd               Int?
+  specsJson             Json?
   equipmentDefaultsJson Json?
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  active                Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   vessels Vessel[]
 
@@ -162,17 +203,17 @@ model VesselRoleTemplate {
 }
 
 model VesselInvitation {
-  id           String    @id @default(uuid())
-  vesselId     String
-  code         String    @unique
-  role         String    @default("guest")
-  invitedById  String
-  claimedById  String?
-  status       String    @default("active")
-  expiresAt    DateTime?
-  claimedAt    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          String    @id @default(uuid())
+  vesselId    String
+  code        String    @unique
+  role        String    @default("guest")
+  invitedById String
+  claimedById String?
+  status      String    @default("active")
+  expiresAt   DateTime?
+  claimedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   vessel Vessel @relation(fields: [vesselId], references: [id])
 
@@ -181,17 +222,17 @@ model VesselInvitation {
 }
 
 model VesselSetupStep {
-  id          String    @id @default(uuid())
-  vesselId    String
-  key         String
-  title       String
-  status      String    @default("open")
-  sortOrder   Int       @default(0)
+  id            String    @id @default(uuid())
+  vesselId      String
+  key           String
+  title         String
+  status        String    @default("open")
+  sortOrder     Int       @default(0)
   completedById String?
-  completedAt DateTime?
-  skippedAt   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  completedAt   DateTime?
+  skippedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   vessel Vessel @relation(fields: [vesselId], references: [id])
 
@@ -214,11 +255,11 @@ model Voyage {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  vessel Vessel @relation(fields: [vesselId], references: [id])
-  participants VoyageParticipant[]
-  auditEvents VoyageAuditEvent[]
-  checklistItems VoyageChecklistItem[]
-  logEntries LogEntry[]
+  vessel           Vessel                @relation(fields: [vesselId], references: [id])
+  participants     VoyageParticipant[]
+  auditEvents      VoyageAuditEvent[]
+  checklistItems   VoyageChecklistItem[]
+  logEntries       LogEntry[]
   discoveryUnlocks DiscoveryUnlock[]
 
   @@index([ownerId, status])
@@ -226,14 +267,14 @@ model Voyage {
 }
 
 model VoyageParticipant {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   voyageId    String
   userId      String
-  role        String   @default("crew")
-  status      String   @default("invited")
+  role        String    @default("crew")
+  status      String    @default("invited")
   confirmedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   voyage Voyage @relation(fields: [voyageId], references: [id])
   user   User   @relation(fields: [userId], references: [id])
@@ -256,16 +297,16 @@ model VoyageAuditEvent {
 }
 
 model VoyageChecklistItem {
-  id          String   @id @default(uuid())
-  voyageId    String
-  title       String
-  category    String   @default("pre_voyage")
-  status      String   @default("open")
-  sortOrder   Int      @default(0)
+  id            String    @id @default(uuid())
+  voyageId      String
+  title         String
+  category      String    @default("pre_voyage")
+  status        String    @default("open")
+  sortOrder     Int       @default(0)
   completedById String?
-  completedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   voyage Voyage @relation(fields: [voyageId], references: [id])
 
@@ -286,9 +327,9 @@ model LogEntry {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user   User    @relation(fields: [userId], references: [id])
-  vessel Vessel  @relation(fields: [vesselId], references: [id])
-  voyage Voyage? @relation(fields: [voyageId], references: [id])
+  user             User              @relation(fields: [userId], references: [id])
+  vessel           Vessel            @relation(fields: [vesselId], references: [id])
+  voyage           Voyage?           @relation(fields: [voyageId], references: [id])
   discoveryUnlocks DiscoveryUnlock[]
 
   @@index([userId, createdAt])
@@ -310,7 +351,7 @@ model Poi {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  confirms PoiConfirm[]
+  confirms       PoiConfirm[]
   discoveryPoint DiscoveryPoint?
 
   @@index([type, status])
@@ -331,41 +372,41 @@ model PoiConfirm {
 }
 
 model DiscoveryPoint {
-  id          String   @id @default(uuid())
-  poiId       String?  @unique
-  name        String
-  type        String
-  lat         Float
-  lng         Float
-  radiusM     Int      @default(250)
-  hidden      Boolean  @default(false)
-  status      String   @default("approved")
-  hint        String?
-  description String?
+  id             String   @id @default(uuid())
+  poiId          String?  @unique
+  name           String
+  type           String
+  lat            Float
+  lng            Float
+  radiusM        Int      @default(250)
+  hidden         Boolean  @default(false)
+  status         String   @default("approved")
+  hint           String?
+  description    String?
   discoveredById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  poi Poi? @relation(fields: [poiId], references: [id])
+  poi     Poi?              @relation(fields: [poiId], references: [id])
   unlocks DiscoveryUnlock[]
 
   @@index([status, hidden])
 }
 
 model DiscoveryUnlock {
-  id          String   @id @default(uuid())
-  pointId     String
-  userId      String
-  vesselId    String
-  voyageId    String
-  logEntryId  String?
-  photoUrl    String
-  lat         Float
-  lng         Float
-  status      String   @default("unlocked")
-  anomalyScore Float   @default(0)
+  id           String   @id @default(uuid())
+  pointId      String
+  userId       String
+  vesselId     String
+  voyageId     String
+  logEntryId   String?
+  photoUrl     String
+  lat          Float
+  lng          Float
+  status       String   @default("unlocked")
+  anomalyScore Float    @default(0)
   reviewNote   String?
-  createdAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
 
   point    DiscoveryPoint @relation(fields: [pointId], references: [id])
   user     User           @relation(fields: [userId], references: [id])
@@ -397,17 +438,17 @@ model SupplyItem {
 }
 
 model EquipmentTemplate {
-  id          String   @id @default(uuid())
-  category    String   @default("other")
-  brand       String?
-  model       String?
-  name        String
+  id                     String   @id @default(uuid())
+  category               String   @default("other")
+  brand                  String?
+  model                  String?
+  name                   String
   defaultMaintenanceDays Int?
-  specsJson   Json?
-  partsJson   Json?
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  specsJson              Json?
+  partsJson              Json?
+  active                 Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   equipment Equipment[]
 
@@ -415,30 +456,30 @@ model EquipmentTemplate {
 }
 
 model Equipment {
-  id          String   @id @default(uuid())
-  vesselId    String
-  templateId  String?
-  name        String
-  category    String   @default("other")
-  brand       String?
-  model       String?
-  status      String   @default("pending_confirmation")
-  location    String?
-  installedAt DateTime?
+  id                      String    @id @default(uuid())
+  vesselId                String
+  templateId              String?
+  name                    String
+  category                String    @default("other")
+  brand                   String?
+  model                   String?
+  status                  String    @default("pending_confirmation")
+  location                String?
+  installedAt             DateTime?
   maintenanceIntervalDays Int?
-  lastServicedAt DateTime?
-  nextDueAt   DateTime?
-  partsJson   Json?
-  metadata    Json?
-  version     Int      @default(1)
-  deletedAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  lastServicedAt          DateTime?
+  nextDueAt               DateTime?
+  partsJson               Json?
+  metadata                Json?
+  version                 Int       @default(1)
+  deletedAt               DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
-  vessel   Vessel @relation(fields: [vesselId], references: [id])
-  template EquipmentTemplate? @relation(fields: [templateId], references: [id])
+  vessel             Vessel              @relation(fields: [vesselId], references: [id])
+  template           EquipmentTemplate?  @relation(fields: [templateId], references: [id])
   maintenanceRecords MaintenanceRecord[]
-  manuals ManualDocument[]
+  manuals            ManualDocument[]
 
   @@index([vesselId, status])
   @@index([nextDueAt])
@@ -446,21 +487,21 @@ model Equipment {
 }
 
 model MaintenanceRecord {
-  id          String   @id @default(uuid())
-  vesselId    String
-  equipmentId String?
-  type        String   @default("service")
-  status      String   @default("open")
-  title       String
-  notes       String?
-  performedAt DateTime?
-  dueAt       DateTime?
-  cost        Float?
-  completedById String?
+  id              String    @id @default(uuid())
+  vesselId        String
+  equipmentId     String?
+  type            String    @default("service")
+  status          String    @default("open")
+  title           String
+  notes           String?
+  performedAt     DateTime?
+  dueAt           DateTime?
+  cost            Float?
+  completedById   String?
   sourceMessageId String?
   sourceActionId  String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   equipment Equipment? @relation(fields: [equipmentId], references: [id])
 
@@ -470,23 +511,23 @@ model MaintenanceRecord {
 }
 
 model ManualDocument {
-  id          String   @id @default(uuid())
-  ownerId     String
-  vesselId    String?
-  equipmentId String?
-  voyageId    String?
-  title       String
-  type        String   @default("knowledge")
-  language    String?
-  source      String?
-  mediaUrl    String?
-  contentText String?
-  metadata    Json?
-  offlinePriority String @default("normal")
-  version     Int      @default(1)
-  deletedAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String    @id @default(uuid())
+  ownerId         String
+  vesselId        String?
+  equipmentId     String?
+  voyageId        String?
+  title           String
+  type            String    @default("knowledge")
+  language        String?
+  source          String?
+  mediaUrl        String?
+  contentText     String?
+  metadata        Json?
+  offlinePriority String    @default("normal")
+  version         Int       @default(1)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   owner     User       @relation(fields: [ownerId], references: [id])
   vessel    Vessel?    @relation(fields: [vesselId], references: [id])
@@ -499,19 +540,19 @@ model ManualDocument {
 }
 
 model Notification {
-  id          String   @id @default(uuid())
-  userId      String
-  vesselId    String?
-  sourceType  String
-  sourceId    String
-  type        String
-  title       String
-  body        String?
-  status      String   @default("unread")
-  severity    String   @default("info")
-  payload     Json?
-  createdAt   DateTime @default(now())
-  readAt      DateTime?
+  id         String    @id @default(uuid())
+  userId     String
+  vesselId   String?
+  sourceType String
+  sourceId   String
+  type       String
+  title      String
+  body       String?
+  status     String    @default("unread")
+  severity   String    @default("info")
+  payload    Json?
+  createdAt  DateTime  @default(now())
+  readAt     DateTime?
 
   user User @relation(fields: [userId], references: [id])
 
@@ -528,7 +569,7 @@ model ChatThread {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  vessel   Vessel? @relation(fields: [vesselId], references: [id])
+  vessel   Vessel?       @relation(fields: [vesselId], references: [id])
   members  ChatMember[]
   messages ChatMessage[]
 
@@ -537,12 +578,12 @@ model ChatThread {
 }
 
 model ChatMember {
-  id        String   @id @default(uuid())
-  threadId  String
-  userId    String
-  role      String   @default("member")
-  status    String   @default("active")
-  joinedAt  DateTime @default(now())
+  id       String   @id @default(uuid())
+  threadId String
+  userId   String
+  role     String   @default("member")
+  status   String   @default("active")
+  joinedAt DateTime @default(now())
 
   thread ChatThread @relation(fields: [threadId], references: [id])
   user   User       @relation(fields: [userId], references: [id])
@@ -567,51 +608,51 @@ model ChatMessage {
 }
 
 model SyncMutation {
-  id        String   @id @default(uuid())
-  userId    String
-  vesselId  String?
-  clientMutationId String @unique
-  entityType String
-  operation  String
-  payload    Json
-  status     String   @default("received")
-  error      String?
-  createdAt  DateTime @default(now())
-  appliedAt  DateTime?
+  id               String    @id @default(uuid())
+  userId           String
+  vesselId         String?
+  clientMutationId String    @unique
+  entityType       String
+  operation        String
+  payload          Json
+  status           String    @default("received")
+  error            String?
+  createdAt        DateTime  @default(now())
+  appliedAt        DateTime?
 
   @@index([userId, createdAt])
   @@index([vesselId, createdAt])
 }
 
 model RewardRule {
-  id                   String   @id @default(uuid())
-  key                  String   @unique
-  sourceCategory       String
-  xpAmount             Int      @default(0)
-  mileageAmount        Int      @default(0)
-  mileageRequiresReview Boolean @default(true)
-  dailyCap             Int?
-  enabled              Boolean  @default(true)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                    String   @id @default(uuid())
+  key                   String   @unique
+  sourceCategory        String
+  xpAmount              Int      @default(0)
+  mileageAmount         Int      @default(0)
+  mileageRequiresReview Boolean  @default(true)
+  dailyCap              Int?
+  enabled               Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model RewardLedger {
-  id                String   @id @default(uuid())
-  idempotencyKey    String   @unique
-  userId            String?
-  vesselId          String?
-  ruleKey           String
-  sourceCategory    String
-  xpAmount          Int      @default(0)
-  mileageAmount     Int      @default(0)
-  mileageStatus     String   @default("pending")
-  sourceType        String
-  sourceId          String
-  anomalyScore      Float?
-  reviewNote        String?
-  settledAt         DateTime?
-  createdAt         DateTime @default(now())
+  id             String    @id @default(uuid())
+  idempotencyKey String    @unique
+  userId         String?
+  vesselId       String?
+  ruleKey        String
+  sourceCategory String
+  xpAmount       Int       @default(0)
+  mileageAmount  Int       @default(0)
+  mileageStatus  String    @default("pending")
+  sourceType     String
+  sourceId       String
+  anomalyScore   Float?
+  reviewNote     String?
+  settledAt      DateTime?
+  createdAt      DateTime  @default(now())
 
   user   User?   @relation(fields: [userId], references: [id])
   vessel Vessel? @relation(fields: [vesselId], references: [id])
@@ -619,4 +660,41 @@ model RewardLedger {
   @@index([userId, createdAt])
   @@index([vesselId, createdAt])
   @@index([mileageStatus])
+}
+
+model MarineCondition {
+  id                    String   @id @default(uuid())
+  latBucket             Float
+  lngBucket             Float
+  timeBucket            DateTime
+  source                String
+  observedAt            DateTime?
+  fetchedAt             DateTime @default(now())
+  temperature           Float?
+  pressure              Float?
+  humidity              Float?
+  visibility            Float?
+  precipitation         Float?
+  weatherCode           String?
+  windSpeed             Float?
+  windDirection         Float?
+  windGust              Float?
+  waveHeight            Float?
+  waveDirection         Float?
+  wavePeriod            Float?
+  windWaveHeight        Float?
+  windWaveDirection     Float?
+  windWavePeriod        Float?
+  swellWaveHeight       Float?
+  swellWaveDirection    Float?
+  swellWavePeriod       Float?
+  seaSurfaceTemperature Float?
+  rawData               Json
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([latBucket, lngBucket, timeBucket, source])
+  @@index([latBucket, lngBucket, timeBucket])
+  @@index([timeBucket])
+  @@index([source, timeBucket])
 }

@@ -31,6 +31,7 @@ export class UsersService {
         gender: true,
         birthDate: true,
         sailingYears: true,
+        activeBadgeId: true,
         roles: true,
         verifiedRoles: true,
         isPublic: true,
@@ -51,7 +52,9 @@ export class UsersService {
   }
 
   async create(data: { nickname: string; email?: string | null; phone?: string | null; passwordHash: string }) {
-    return this.prisma.user.create({ data })
+    const user = await this.prisma.user.create({ data })
+    await this.ensureDefaultBadges(user.id)
+    return user
   }
 
   async updateProfile(id: string, dto: UpdateProfileDto) {
@@ -63,6 +66,9 @@ export class UsersService {
       })
       if (!vessel) throw new BadRequestException('船只不存在')
       if (vessel.ownerId !== id) throw new ForbiddenException('无权设置该船只为当前船只')
+    }
+    if (dto.activeBadgeId) {
+      await this.ensureUserCanUseBadge(id, dto.activeBadgeId)
     }
     return this.prisma.user.update({
       where: { id },
@@ -83,6 +89,7 @@ export class UsersService {
         gender: true,
         birthDate: true,
         sailingYears: true,
+        activeBadgeId: true,
         roles: true,
         verifiedRoles: true,
         isPublic: true,
@@ -90,6 +97,89 @@ export class UsersService {
         currentVesselId: true,
         createdAt: true,
       },
+    })
+  }
+
+  async listAvailableBadges(userId: string) {
+    await this.ensureDefaultBadges(userId)
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+      select: { activeBadgeId: true },
+    })
+    if (!user) throw new NotFoundException('用户不存在')
+
+    const items = await this.prisma.userBadge.findMany({
+      where: {
+        userId,
+        status: 'available',
+        badge: { status: 'active' },
+      },
+      include: { badge: true },
+      orderBy: [{ badge: { sortOrder: 'asc' } }, { grantedAt: 'asc' }],
+    })
+
+    return {
+      activeBadgeId: user.activeBadgeId,
+      badges: items.map((item) => ({
+        id: item.badge.id,
+        kind: item.badge.kind,
+        status: item.badge.status,
+        title: item.badge.title,
+        description: item.badge.description,
+        imageKey: item.badge.imageKey,
+        sortOrder: item.badge.sortOrder,
+        userBadgeStatus: item.status,
+        source: item.source,
+        grantedAt: item.grantedAt,
+      })),
+    }
+  }
+
+  async setActiveBadge(userId: string, badgeId?: string | null) {
+    if (badgeId) await this.ensureUserCanUseBadge(userId, badgeId)
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { activeBadgeId: badgeId ?? null },
+      select: {
+        id: true,
+        activeBadgeId: true,
+      },
+    })
+    return {
+      activeBadgeId: user.activeBadgeId,
+      badge: user.activeBadgeId ? (await this.prisma.badge.findUnique({ where: { id: user.activeBadgeId } })) : null,
+    }
+  }
+
+  private async ensureUserCanUseBadge(userId: string, badgeId: string) {
+    await this.ensureDefaultBadges(userId)
+    const userBadge = await this.prisma.userBadge.findFirst({
+      where: {
+        userId,
+        badgeId,
+        status: 'available',
+        badge: { status: 'active' },
+      },
+      select: { id: true },
+    })
+    if (!userBadge) throw new BadRequestException('徽章不可用或尚未启用')
+  }
+
+  private async ensureDefaultBadges(userId: string) {
+    const badges = await this.prisma.badge.findMany({
+      where: { kind: 'system_achievement', status: 'active' },
+      select: { id: true },
+    })
+    if (!badges.length) return
+    await this.prisma.userBadge.createMany({
+      data: badges.map((badge) => ({
+        id: `${userId}:${badge.id}`,
+        userId,
+        badgeId: badge.id,
+        status: 'available',
+        source: 'system',
+      })),
+      skipDuplicates: true,
     })
   }
 
