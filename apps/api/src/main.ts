@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import 'reflect-metadata'
 import { config as loadEnv } from 'dotenv'
 import { NestFactory } from '@nestjs/core'
