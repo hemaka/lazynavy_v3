@@ -2,6 +2,7 @@ import { Stack, usePathname } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
 import { ActivityIndicator, StyleSheet, View } from 'react-native'
+import { LocationProvider } from '../features/location/location-provider'
 import { AuthProvider, LoginScreen, useAuth } from '../modules/identity/public'
 import { ChatOverlayProvider } from '../modules/messages/ChatOverlay'
 import { BottomNavTransitionProvider, useBottomNavTransition } from '../navigation/bottomNavTransition'
@@ -57,7 +58,9 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <StatusBar style="dark" translucent />
-      <Gate />
+      <LocationProvider>
+        <Gate />
+      </LocationProvider>
     </AuthProvider>
   )
 }

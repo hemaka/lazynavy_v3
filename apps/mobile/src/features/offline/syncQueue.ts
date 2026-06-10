@@ -1,6 +1,6 @@
 import type { SQLiteBindValue, SQLiteDatabase } from 'expo-sqlite'
 
-export type SyncEntity = 'log' | 'supply' | 'equipment' | 'manual' | 'voyage' | 'vessel'
+export type SyncEntity = 'log' | 'supply' | 'equipment' | 'manual' | 'voyage' | 'vessel' | 'location_point' | 'presence_event'
 export type SyncAction = 'create' | 'update' | 'delete'
 export type SyncStatus = 'pending' | 'syncing' | 'failed'
 

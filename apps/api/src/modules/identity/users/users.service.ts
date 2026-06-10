@@ -1,8 +1,22 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { envNumber } from '../../../config/env'
 import { PrismaService } from '../../../prisma/prisma.service'
 import { UpdateProfileDto } from './dto/update-profile.dto'
 
 const DEFAULT_ACTIVE_BADGE_ID = '01_beginner'
+const DEFAULT_MARINE_CONDITION_REFRESH_INTERVAL_MINUTES = 15
+const DEFAULT_MARINE_CONDITION_REFRESH_DISTANCE_KM = 5
+const DEFAULT_VOYAGE_LOCATION_MIN_INTERVAL_SECONDS = 5
+const DEFAULT_VOYAGE_LOCATION_MIN_DISTANCE_METERS = 15
+const DEFAULT_VOYAGE_LOCATION_MAX_INTERVAL_SECONDS = 60
+const DEFAULT_VOYAGE_LOCATION_MAX_ACCURACY_METERS = 50
+const DEFAULT_ASHORE_LOCATION_MIN_INTERVAL_SECONDS = 30
+const DEFAULT_ASHORE_LOCATION_MIN_DISTANCE_METERS = 25
+const DEFAULT_ASHORE_LOCATION_MAX_INTERVAL_SECONDS = 300
+const DEFAULT_ASHORE_LOCATION_MAX_ACCURACY_METERS = 75
+const DEFAULT_LEAVE_VESSEL_DISTANCE_METERS = 80
+const DEFAULT_RETURN_VESSEL_DISTANCE_METERS = 40
+const DEFAULT_LEAVE_VESSEL_GRACE_SECONDS = 180
 
 @Injectable()
 export class UsersService {
@@ -244,6 +258,37 @@ export class UsersService {
 
   safeUser(user: any) {
     const { passwordHash, deletedAt, ...safe } = user
-    return safe
+    return {
+      ...safe,
+      clientConfig: clientConfig(),
+    }
+  }
+}
+
+function clientConfig() {
+  return {
+    marineCondition: {
+      refreshIntervalMinutes: envNumber('MARINE_CONDITION_REFRESH_INTERVAL_MINUTES', DEFAULT_MARINE_CONDITION_REFRESH_INTERVAL_MINUTES),
+      refreshDistanceKm: envNumber('MARINE_CONDITION_REFRESH_DISTANCE_KM', DEFAULT_MARINE_CONDITION_REFRESH_DISTANCE_KM),
+    },
+    locationTracking: {
+      voyage: {
+        minIntervalSeconds: envNumber('VOYAGE_LOCATION_MIN_INTERVAL_SECONDS', DEFAULT_VOYAGE_LOCATION_MIN_INTERVAL_SECONDS),
+        minDistanceMeters: envNumber('VOYAGE_LOCATION_MIN_DISTANCE_METERS', DEFAULT_VOYAGE_LOCATION_MIN_DISTANCE_METERS),
+        maxIntervalSeconds: envNumber('VOYAGE_LOCATION_MAX_INTERVAL_SECONDS', DEFAULT_VOYAGE_LOCATION_MAX_INTERVAL_SECONDS),
+        maxAccuracyMeters: envNumber('VOYAGE_LOCATION_MAX_ACCURACY_METERS', DEFAULT_VOYAGE_LOCATION_MAX_ACCURACY_METERS),
+      },
+      ashore: {
+        minIntervalSeconds: envNumber('ASHORE_LOCATION_MIN_INTERVAL_SECONDS', DEFAULT_ASHORE_LOCATION_MIN_INTERVAL_SECONDS),
+        minDistanceMeters: envNumber('ASHORE_LOCATION_MIN_DISTANCE_METERS', DEFAULT_ASHORE_LOCATION_MIN_DISTANCE_METERS),
+        maxIntervalSeconds: envNumber('ASHORE_LOCATION_MAX_INTERVAL_SECONDS', DEFAULT_ASHORE_LOCATION_MAX_INTERVAL_SECONDS),
+        maxAccuracyMeters: envNumber('ASHORE_LOCATION_MAX_ACCURACY_METERS', DEFAULT_ASHORE_LOCATION_MAX_ACCURACY_METERS),
+      },
+      vesselPresence: {
+        leaveDistanceMeters: envNumber('LEAVE_VESSEL_DISTANCE_METERS', DEFAULT_LEAVE_VESSEL_DISTANCE_METERS),
+        returnDistanceMeters: envNumber('RETURN_VESSEL_DISTANCE_METERS', DEFAULT_RETURN_VESSEL_DISTANCE_METERS),
+        graceSeconds: envNumber('LEAVE_VESSEL_GRACE_SECONDS', DEFAULT_LEAVE_VESSEL_GRACE_SECONDS),
+      },
+    },
   }
 }

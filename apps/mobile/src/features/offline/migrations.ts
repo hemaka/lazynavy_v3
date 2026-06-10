@@ -55,6 +55,36 @@ const B001_INIT_BUSINESS: Migration = {
   `,
 }
 
+const B002_LOCATION_POINTS: Migration = {
+  id: 2,
+  name: 'location_points',
+  sql: `
+    CREATE TABLE IF NOT EXISTS location_points (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      vessel_id TEXT,
+      voyage_id TEXT,
+      mode TEXT NOT NULL,
+      presence_status TEXT NOT NULL DEFAULT 'unknown',
+      lat REAL NOT NULL,
+      lng REAL NOT NULL,
+      accuracy_m REAL,
+      speed_mps REAL,
+      heading REAL,
+      altitude REAL,
+      recorded_at INTEGER NOT NULL,
+      synced_at INTEGER,
+      sync_status TEXT NOT NULL DEFAULT 'pending',
+      quality TEXT NOT NULL DEFAULT 'good',
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_location_points_recorded ON location_points(recorded_at);
+    CREATE INDEX IF NOT EXISTS idx_location_points_sync ON location_points(sync_status, recorded_at);
+    CREATE INDEX IF NOT EXISTS idx_location_points_voyage ON location_points(voyage_id, recorded_at);
+    CREATE INDEX IF NOT EXISTS idx_location_points_mode ON location_points(mode, recorded_at);
+  `,
+}
+
 const S001_INIT_POIS: Migration = {
   id: 1,
   name: 'init_pois',
@@ -144,4 +174,4 @@ const S002_POI_DETAIL_CACHE: Migration = {
 }
 
 export const SHARED_MIGRATIONS: Migration[] = [S001_INIT_POIS, S002_POI_DETAIL_CACHE]
-export const BUSINESS_MIGRATIONS: Migration[] = [B001_INIT_BUSINESS]
+export const BUSINESS_MIGRATIONS: Migration[] = [B001_INIT_BUSINESS, B002_LOCATION_POINTS]

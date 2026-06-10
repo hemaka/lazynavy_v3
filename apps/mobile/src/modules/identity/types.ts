@@ -1,5 +1,31 @@
 export type UserRole = 'CREW' | 'CAPTAIN' | 'OWNER' | 'MERCHANT' | string
 
+export interface ClientConfig {
+  marineCondition?: {
+    refreshIntervalMinutes: number
+    refreshDistanceKm: number
+  }
+  locationTracking?: {
+    voyage: {
+      minIntervalSeconds: number
+      minDistanceMeters: number
+      maxIntervalSeconds: number
+      maxAccuracyMeters: number
+    }
+    ashore: {
+      minIntervalSeconds: number
+      minDistanceMeters: number
+      maxIntervalSeconds: number
+      maxAccuracyMeters: number
+    }
+    vesselPresence: {
+      leaveDistanceMeters: number
+      returnDistanceMeters: number
+      graceSeconds: number
+    }
+  }
+}
+
 export interface AuthUser {
   id: string
   phone?: string | null
@@ -37,6 +63,7 @@ export interface AuthUser {
   isPublic?: boolean
   locationPolicy?: 'exact' | 'region' | 'hidden' | string
   currentVesselId?: string | null
+  clientConfig?: ClientConfig
   createdAt?: string
   updatedAt?: string
 }

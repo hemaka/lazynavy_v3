@@ -11,10 +11,17 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.lazynavy-v3",
-      "appleTeamId": "N2UQHXDELE"
+      "appleTeamId": "N2UQHXDELE",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "LazyNavy uses your location to record voyage and shore visit tracks while the app is open."
+      }
     },
     "android": {
       "package": "com.anonymous.lazynavyv3",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#071d36"
