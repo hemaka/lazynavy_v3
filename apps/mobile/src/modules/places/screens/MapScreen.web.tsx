@@ -1,9 +1,7 @@
-import { router } from 'expo-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { POI, PoiCategory, PoiRegionSummary } from '@lazynavy-v3/types'
 import { listPoisApi, listPoiSummariesApi } from '../api/client'
 import { localizeMooring, localizeSeabed } from '../utils/present'
-import { bottomNav } from '../../../navigation/navConfig'
 import { useTheme } from '../../../theme'
 import { useI18n } from '../../../i18n'
 
@@ -699,49 +697,6 @@ export default function MapScreenWeb() {
       background: t.surface,
       color: t.textDim,
       fontSize: 14,
-    },
-    bottomNav: {
-      position: 'fixed' as const,
-      left: 12,
-      right: 12,
-      bottom: 20,
-      height: 58,
-      zIndex: 740,
-      borderRadius: 16,
-      background: 'rgba(244,252,255,0.94)',
-      border: '1px solid rgba(255,255,255,0.88)',
-      boxShadow: '0 8px 14px rgba(7,89,133,0.14)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-around',
-      overflow: 'hidden' as const,
-      backdropFilter: 'blur(18px)',
-    },
-    navItem: {
-      flex: 1,
-      height: 48,
-      border: 0,
-      borderRight: '1px solid rgba(14,116,144,0.12)',
-      background: 'transparent',
-      color: '#123047',
-      display: 'grid',
-      placeItems: 'center',
-      alignContent: 'center',
-      gap: 2,
-      cursor: 'pointer',
-      fontFamily: 'inherit',
-    },
-    navIcon: {
-      color: '#0e7490',
-      fontSize: 24,
-      fontWeight: 900,
-      lineHeight: 1,
-    },
-    navText: {
-      color: '#123047',
-      fontSize: 10,
-      fontWeight: 600,
-      lineHeight: 1.1,
     },
     modalBackdrop: {
       position: 'absolute' as const,
@@ -1518,19 +1473,6 @@ export default function MapScreenWeb() {
         ) : null}
       </div>
 
-      <div style={styles.bottomNav}>
-        {bottomNav.map((item, index) => (
-          <button
-            key={item.key}
-            style={{ ...styles.navItem, borderRight: index === bottomNav.length - 1 ? 0 : styles.navItem.borderRight }}
-            onClick={() => router.push(item.href as never)}
-          >
-            <span style={styles.navIcon}>{glyphForNav(item.icon)}</span>
-            <span style={styles.navText}>{item.label}</span>
-          </button>
-        ))}
-      </div>
-
       {selectedPoi ? (
         <div
           style={styles.modalBackdrop}
@@ -1651,13 +1593,4 @@ export default function MapScreenWeb() {
       ) : null}
     </div>
   )
-}
-
-function glyphForNav(icon: string) {
-  if (icon === 'home') return '⌂'
-  if (icon === 'map') return '⌖'
-  if (icon === 'book') return '▤'
-  if (icon === 'user') return '◎'
-  if (icon === 'route') return '◢'
-  return icon.slice(0, 1).toUpperCase()
 }

@@ -14,7 +14,6 @@ import {
 import { AuthModal } from '../components/AuthModal'
 import { useAuth } from '../context'
 import type { AuthUser } from '../types'
-import { BottomTabBar } from '../../../shared/ui/BottomTabBar'
 import { useTheme } from '../../../theme'
 
 export function ProfileScreen() {
@@ -54,7 +53,6 @@ export function ProfileScreen() {
           <GuestProfile onLogin={() => setAuthVisible(true)} styles={styles} />
         )}
       </ScrollView>
-      <BottomTabBar />
       <AuthModal visible={authVisible} onClose={() => setAuthVisible(false)} />
     </View>
   )

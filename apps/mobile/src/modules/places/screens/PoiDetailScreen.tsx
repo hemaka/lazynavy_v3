@@ -214,9 +214,9 @@ export default function PoiDetailScreen() {
     },
     topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     iconBtn: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       backgroundColor: 'rgba(7,29,54,0.48)',
       borderWidth: 0.5,
       borderColor: 'rgba(255,255,255,0.16)',

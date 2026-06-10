@@ -13,7 +13,7 @@ const glyphs: Record<string, string> = {
   layout: '□',
   camera: '◉',
   user: '◎',
-  message: '✉',
+  message: '▢',
 }
 
 export function IconGlyph({ name, color = '#123047', size = 18, style }: { name: string; color?: string; size?: number; style?: TextStyle }) {

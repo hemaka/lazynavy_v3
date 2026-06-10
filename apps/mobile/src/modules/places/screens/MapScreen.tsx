@@ -17,7 +17,6 @@ import type { POI, PoiCategory, PoiRegionSummary } from '@lazynavy-v3/types'
 import { listPoisApi, listPoiSummariesApi } from '../api/client'
 import { poiStore } from '../offline/poiStore'
 import { colorForCategory, iconForPoi, labelForCategory, POI_TYPES, shortInfoOf } from '../utils/present'
-import { BottomTabBar } from '../../../shared/ui/BottomTabBar'
 import { useTheme } from '../../../theme'
 import { useI18n } from '../../../i18n'
 
@@ -232,9 +231,9 @@ export default function MapScreen() {
       paddingVertical: 0,
     },
     searchBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -260,9 +259,9 @@ export default function MapScreen() {
       gap: 10,
     },
     toolBtn: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       backgroundColor: 'rgba(255,255,255,0.94)',
       alignItems: 'center',
       justifyContent: 'center',
@@ -742,7 +741,6 @@ export default function MapScreen() {
           <Text style={s.statusText}>{renderStatusText()}</Text>
         </View>
       )}
-      <BottomTabBar />
     </View>
   )
 }

@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Dimensions,
@@ -12,7 +12,6 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { CaptainHudResponse } from '@lazynavy-v3/types'
-import { bottomNav } from '../../navigation/navConfig'
 import { IconGlyph } from '../../shared/ui/IconGlyph'
 import { colors } from '../../theme/tokens'
 import { useChatOverlay } from '../messages/ChatOverlay'
@@ -20,6 +19,7 @@ import { createVessel, getCaptainHud } from './api'
 import { fallbackHud } from './fallbackHud'
 
 const { width, height } = Dimensions.get('window')
+const HOME_CONTENT_INSET = 18
 const hudBackground = require('../../assets/hud_bg_2.png')
 const hudBackgroundWidth = height * (2250 / 1500)
 
@@ -47,11 +47,6 @@ export function HomeCaptainHudScreen() {
     }
   }, [emptyPreview])
 
-  const xpPercent = useMemo(() => {
-    if (!hud?.user) return 0
-    return Math.min(1, hud.user.xp / Math.max(hud.user.nextLevelXp, 1))
-  }, [hud])
-
   async function handleCreateBoat() {
     try {
       await createVessel('Morning Star')
@@ -77,7 +72,6 @@ export function HomeCaptainHudScreen() {
   const weatherTop = topArea + 76
   const sideButtonTop = topArea + 176
   const alertBottom = bottomArea + 74
-  const navBottom = bottomArea
 
   return (
     <View style={styles.screen}>
@@ -93,13 +87,13 @@ export function HomeCaptainHudScreen() {
                 <Text numberOfLines={1} style={styles.playerName}>{hud.user.nickname}</Text>
               </View>
               <Text style={styles.xpText}>Lv. {hud.user.level} · {hud.user.xp.toLocaleString()} / {hud.user.nextLevelXp.toLocaleString()} XP</Text>
-              <View style={styles.xpTrack}><View style={[styles.xpFill, { width: `${xpPercent * 100}%` }]} /></View>
             </View>
+            <View style={styles.playerBadge}><Text style={styles.playerBadgeIcon}>✓</Text></View>
           </View>
         )}
         {hud.user && (
-          <Pressable style={[styles.messageButton, { top: topArea + 4 }]} onPress={chatOverlay.openChat}>
-            <Text style={styles.messageIcon}>✉</Text>
+          <Pressable style={[styles.messageButton, { top: topArea }]} onPress={chatOverlay.openChat}>
+            <ChatBubbleIcon />
             <View style={styles.messageDot} />
           </Pressable>
         )}
@@ -162,18 +156,6 @@ export function HomeCaptainHudScreen() {
           </View>
         )}
 
-        <View style={[styles.bottomNav, { bottom: navBottom }]}>
-          {bottomNav.map((item, index) => (
-            <Pressable
-              key={item.key}
-              style={[styles.navItem, index === bottomNav.length - 1 && styles.navItemLast]}
-              onPress={() => router.push(item.href as never)}
-            >
-              <IconGlyph name={item.icon} color={colors.accent} size={24}/>
-              <Text style={styles.navText}>{item.label}</Text>
-            </Pressable>
-          ))}
-        </View>
       </View>
     </View>
   )
@@ -184,6 +166,14 @@ function Shortcut({ item }: { item: { href: string; icon: string; label: string 
     <Pressable style={styles.shortcut} onPress={() => router.push(item.href as never)}>
       <IconGlyph name={item.icon} color={colors.white} size={30} />
     </Pressable>
+  )
+}
+
+function ChatBubbleIcon() {
+  return (
+    <View style={styles.chatBubbleIcon}>
+      <View style={styles.chatBubbleTail} />
+    </View>
   )
 }
 
@@ -308,28 +298,29 @@ const styles = StyleSheet.create({
   sailSmall: { position: 'absolute', left: '24%', bottom: 66, width: 0, height: 0, borderLeftWidth: 48, borderRightWidth: 0, borderBottomWidth: 94, borderLeftColor: 'transparent', borderBottomColor: 'rgba(232,247,255,0.94)' },
   cabin: { position: 'absolute', left: '34%', right: '24%', bottom: 42, height: 22, borderTopLeftRadius: 12, borderTopRightRadius: 12, backgroundColor: 'rgba(255,255,255,0.94)' },
   hull: { position: 'absolute', bottom: 26, left: '18%', right: '11%', height: 30, borderBottomLeftRadius: 34, borderBottomRightRadius: 34, backgroundColor: 'rgba(255,255,255,0.96)', borderBottomWidth: 4, borderBottomColor: '#0f5471' },
-  playerHud: { marginLeft: 52, marginRight: 70, marginTop: 18, minHeight: 0, paddingLeft: 40, paddingRight: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(255, 255, 255, 0.42)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)', flexDirection: 'row', alignItems: 'center', shadowColor: '#075985', shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
-  avatarWrap: { position: 'absolute', left: -44, top: -7, width: 74, height: 74 },
-  avatar: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#bfe9ff', borderWidth: 1, borderColor: colors.white, alignItems: 'center', justifyContent: 'center', shadowColor: '#075985', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
-  avatarText: { color: colors.ink, fontWeight: '900', fontSize: 25 },
+  playerHud: { marginLeft: HOME_CONTENT_INSET, marginRight: 80, marginTop: 18, height: 44, paddingLeft: 0, paddingRight: 4, paddingVertical: 0, borderRadius: 22, backgroundColor: 'rgba(255, 255, 255, 0.42)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)', flexDirection: 'row', alignItems: 'center', gap: 8, shadowColor: '#075985', shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
+  avatarWrap: { width: 64, height: 64 },
+  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#bfe9ff', borderWidth: 1, borderColor: colors.white, alignItems: 'center', justifyContent: 'center', shadowColor: '#075985', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
+  avatarText: { color: colors.ink, fontWeight: '900', fontSize: 22 },
   playerMain: { flex: 1 },
-  playerRow: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 18 },
-  playerName: { color: '#071735', fontSize: 16, fontWeight: '600', maxWidth: width * 0.8, paddingBottom: 4 },
-  xpText: { color: '#071735', fontSize: 11, fontWeight: '500', marginTop: 2 },
-  xpTrack: { height: 4, borderRadius: 2, backgroundColor: 'rgba(14,116,144,0.22)', overflow: 'hidden', marginTop: 6, maxWidth: width * 0.8 },
-  xpFill: { height: '100%', backgroundColor: '#10b8bd', borderRadius: 2 },
+  playerRow: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 16 },
+  playerName: { color: '#071735', fontSize: 13, fontWeight: '700', maxWidth: width * 0.56 },
+  playerBadge: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#008ba5', borderWidth: 1, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  playerBadgeIcon: { color: colors.white, fontSize: 19, fontWeight: '900', lineHeight: 22 },
+  xpText: { color: '#071735', fontSize: 9, fontWeight: '600', marginTop: 0 },
   previewToggle: { width: 54, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,119,182,0.1)' },
   previewText: { color: colors.accent, fontWeight: '900', fontSize: 11 },
-  messageButton: { position: 'absolute', right: 12, top: 38, width: 40, height: 40, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.28)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.76)', alignItems: 'center', justifyContent: 'center' },
-  messageIcon: { color: colors.white, fontSize: 24, fontWeight: '900' },
-  messageDot: { position: 'absolute', right: -6, top: -6, width: 16, height: 16, borderRadius: 8, backgroundColor: '#ff4b3e', borderWidth: 2, borderColor: colors.white },
-  vesselInfoCard: { minWidth: 244, maxWidth: width - 72, minHeight: 58, paddingLeft: 8, paddingRight: 8, paddingVertical: 7, borderRadius: 20, backgroundColor: 'rgba(244,252,255,0.82)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', flexDirection: 'row', alignItems: 'center', gap: 9, shadowColor: '#075985', shadowOpacity: 0.14, shadowRadius: 14, shadowOffset: { width: 0, height: 7 } },
-  vesselPhoto: { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(0,139,165,0.16)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.86)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  messageButton: { position: 'absolute', right: HOME_CONTENT_INSET, top: 38, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.28)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.76)', alignItems: 'center', justifyContent: 'center' },
+  chatBubbleIcon: { width: 22, height: 17, borderRadius: 9, borderWidth: 2, borderColor: colors.white },
+  chatBubbleTail: { position: 'absolute', right: 2, bottom: -5, width: 8, height: 8, borderRightWidth: 2, borderBottomWidth: 2, borderColor: colors.white, transform: [{ rotate: '32deg' }] },
+  messageDot: { position: 'absolute', right: -2, top: -2, width: 16, height: 16, borderRadius: 8, backgroundColor: '#ff4b3e', borderWidth: 2, borderColor: colors.white },
+  vesselInfoCard: { minWidth: 244, maxWidth: width - 72, minHeight: 58, paddingLeft: 8, paddingRight: 8, paddingVertical: 7, borderRadius: 29, backgroundColor: 'rgba(244,252,255,0.82)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', flexDirection: 'row', alignItems: 'center', gap: 9, shadowColor: '#075985', shadowOpacity: 0.14, shadowRadius: 14, shadowOffset: { width: 0, height: 7 } },
+  vesselPhoto: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,139,165,0.16)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.86)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   vesselPhotoIcon: { color: '#008ba5', fontSize: 24, fontWeight: '900' },
   vesselInfoMain: { flex: 1, minWidth: 0 },
   vesselNickname: { color: '#071735', fontSize: 14, fontWeight: '900' },
   vesselRegisteredName: { color: '#0786a6', fontSize: 10, fontWeight: '900', marginTop: 3 },
-  vesselCaptainAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#d9f2ff', borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+  vesselCaptainAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#d9f2ff', borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' },
   vesselCaptainText: { color: '#071735', fontSize: 17, fontWeight: '900' },
   conditionRow: { position: 'absolute', left: 58, right: 58, top: 94, flexDirection: 'row', justifyContent: 'center', gap: 8 },
   conditionChip: { minWidth: 82, height: 30, paddingHorizontal: 9, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.78)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.86)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
@@ -358,9 +349,9 @@ const styles = StyleSheet.create({
   crewSheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,18,38,0.22)' },
   crewSheet: { marginHorizontal: 18, marginBottom: 104, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16, borderRadius: 18, backgroundColor: 'rgba(244,252,255,0.97)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', shadowColor: '#062d45', shadowOpacity: 0.22, shadowRadius: 18, shadowOffset: { width: 0, height: 10 } },
   sheetHandle: { alignSelf: 'center', width: 42, height: 4, borderRadius: 2, backgroundColor: 'rgba(14,116,144,0.22)', marginBottom: 10 },
-  sheetHeader: { minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  sheetHeader: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   sheetTitle: { color: '#071735', fontSize: 17, fontWeight: '900' },
-  sheetClose: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(14,116,144,0.08)' },
+  sheetClose: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(14,116,144,0.08)' },
   sheetCloseText: { color: '#071735', fontSize: 22, fontWeight: '800', lineHeight: 24 },
   memberRow: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: 1, borderTopColor: 'rgba(14,116,144,0.12)' },
   memberAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#d9f2ff', borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center' },
@@ -373,13 +364,13 @@ const styles = StyleSheet.create({
   memberMutedText: { color: 'rgba(7,23,53,0.64)', fontSize: 12, fontWeight: '800' },
   inviteButton: { height: 44, borderRadius: 12, marginTop: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#008ba5' },
   inviteButtonText: { color: colors.white, fontSize: 15, fontWeight: '900' },
-  alert: { position: 'absolute', left: 18, right: 18, bottom: 92, minHeight: 56, padding: 9, borderRadius: 16, backgroundColor: 'rgba(244,252,255,0.94)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.86)', flexDirection: 'row', alignItems: 'center', gap: 9, shadowColor: '#075985', shadowOpacity: 0.14, shadowRadius: 12, shadowOffset: { width: 0, height: 7 } },
+  alert: { position: 'absolute', left: 18, right: 18, bottom: 92, minHeight: 56, padding: 9, borderRadius: 28, backgroundColor: 'rgba(244,252,255,0.94)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.86)', flexDirection: 'row', alignItems: 'center', gap: 9, shadowColor: '#075985', shadowOpacity: 0.14, shadowRadius: 12, shadowOffset: { width: 0, height: 7 } },
   alertIconWrap: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   alertIcon: { color: '#fb6a21', fontSize: 31, fontWeight: '900' },
   alertMain: { flex: 1 },
   alertTitle: { color: '#071735', fontSize: 13, fontWeight: '900' },
   alertText: { color: '#071735', fontSize: 11, fontWeight: '800', marginTop: 3 },
-  reviewButton: { minWidth: 88, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#008ba5' },
+  reviewButton: { minWidth: 88, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#008ba5' },
   reviewText: { color: colors.white, fontSize: 15, fontWeight: '900' },
   shortcutsLeft: { position: 'absolute', left: 20, top: '23%', gap: 22 },
   shortcutsRight: { position: 'absolute', right: 20, top: '23%', gap: 22 },
@@ -392,8 +383,4 @@ const styles = StyleSheet.create({
   primaryText: { color: colors.white, fontWeight: '900' },
   secondaryBtn: { minWidth: 132, paddingVertical: 13, alignItems: 'center', borderRadius: 14, backgroundColor: colors.panelStrong, borderWidth: 1, borderColor: colors.line },
   secondaryText: { color: colors.accent, fontWeight: '900' },
-  bottomNav: { position: 'absolute', left: 12, right: 12, bottom: 18, height: 58, borderRadius: 16, backgroundColor: 'rgba(244,252,255,0.92)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.88)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', shadowColor: '#075985', shadowOpacity: 0.14, shadowRadius: 14, shadowOffset: { width: 0, height: 8 } },
-  navItem: { flex: 1, height: 48, alignItems: 'center', justifyContent: 'center', gap: 2, borderRightWidth: 1, borderRightColor: 'rgba(14,116,144,0.12)' },
-  navItemLast: { borderRightWidth: 0 },
-  navText: { color: colors.ink, fontSize: 10, fontWeight: '600' },
 })

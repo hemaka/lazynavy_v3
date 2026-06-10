@@ -1,5 +1,4 @@
 import { LinearGradient } from 'expo-linear-gradient'
-import { router } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { getCaptainHud } from '../home/api'
@@ -81,7 +80,6 @@ export function LogScreen() {
 function Header({ title, kicker }: { title: string; kicker: string }) {
   return (
     <View style={styles.header}>
-      <Pressable style={styles.back} onPress={() => router.back()}><Text style={styles.backText}>‹</Text></Pressable>
       <View><Text style={styles.kicker}>{kicker}</Text><Text style={styles.title}>{title}</Text></View>
     </View>
   )
@@ -89,13 +87,11 @@ function Header({ title, kicker }: { title: string; kicker: string }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  safe: { flex: 1, paddingHorizontal: 18, paddingTop: 10 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 },
-  back: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.panelStrong, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
-  backText: { color: colors.ink, fontSize: 30, lineHeight: 32, fontWeight: '700' },
+  safe: { flex: 1, paddingHorizontal: 18, paddingTop: 18 },
+  header: { marginBottom: 20 },
   kicker: { color: colors.accent, fontSize: 12, fontWeight: '900', letterSpacing: 1 },
   title: { color: colors.ink, fontSize: 26, fontWeight: '900' },
-  content: { gap: 12, paddingBottom: 40 },
+  content: { gap: 12, paddingBottom: 120 },
   primary: { paddingVertical: 13, borderRadius: 14, backgroundColor: colors.accent, alignItems: 'center' },
   primaryText: { color: colors.white, fontWeight: '900' },
   disabled: { opacity: 0.45 },
