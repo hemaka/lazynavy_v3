@@ -90,13 +90,19 @@ export function HomeCaptainHudScreen() {
               </View>
               <Text style={styles.xpText}>Lv. {hud.user.level} · {hud.user.xp.toLocaleString()} / {hud.user.nextLevelXp.toLocaleString()} XP</Text>
             </View>
-            <View style={styles.playerBadge}>
+            <Pressable
+              style={styles.playerBadge}
+              onPress={() => router.push('/profile?panel=badges' as never)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="打开我的徽章"
+            >
               {activeBadge ? (
                 <Image source={activeBadge.image} style={styles.playerBadgeImage} resizeMode="contain" />
               ) : (
                 <Text style={styles.playerBadgeIcon}>✓</Text>
               )}
-            </View>
+            </Pressable>
           </View>
         )}
         {hud.user && (

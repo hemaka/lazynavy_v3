@@ -1,5 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient'
-import { useCallback, useMemo, useState } from 'react'
+import { useLocalSearchParams } from 'expo-router'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Image,
@@ -21,9 +22,11 @@ import { useTheme } from '../../../theme'
 
 export function ProfileScreen() {
   const theme = useTheme()
+  const params = useLocalSearchParams<{ panel?: string }>()
   const { isLoggedIn, user, ready, refreshUser, logout, token } = useAuth()
   const [authVisible, setAuthVisible] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const openBadgePanel = params.panel === 'badges'
 
   const styles = useMemo(() => createStyles(theme), [theme])
 
@@ -51,7 +54,14 @@ export function ProfileScreen() {
             <ActivityIndicator color={theme.accent} />
           </View>
         ) : isLoggedIn && user ? (
-          <SignedInProfile user={user} token={token} onUpdated={refreshUser} onLogout={() => void logout()} styles={styles} />
+          <SignedInProfile
+            user={user}
+            token={token}
+            autoOpenBadges={openBadgePanel}
+            onUpdated={refreshUser}
+            onLogout={() => void logout()}
+            styles={styles}
+          />
         ) : (
           <GuestProfile onLogin={() => setAuthVisible(true)} styles={styles} />
         )}
@@ -64,12 +74,14 @@ export function ProfileScreen() {
 function SignedInProfile({
   user,
   token,
+  autoOpenBadges,
   onUpdated,
   onLogout,
   styles,
 }: {
   user: AuthUser
   token: string | null
+  autoOpenBadges: boolean
   onUpdated: () => Promise<void>
   onLogout: () => void
   styles: ReturnType<typeof createStyles>
@@ -101,6 +113,11 @@ function SignedInProfile({
       setLoadingBadges(false)
     }
   }, [token])
+
+  useEffect(() => {
+    if (!autoOpenBadges) return
+    void openBadgeSheet()
+  }, [autoOpenBadges, openBadgeSheet])
 
   const selectBadge = useCallback(async (badgeId: string | null) => {
     if (!token) return
