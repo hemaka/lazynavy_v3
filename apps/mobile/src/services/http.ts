@@ -50,11 +50,22 @@ export async function deleteJson<T>(path: string, token?: string | null): Promis
   return res.json() as Promise<T>
 }
 
+export async function postForm<T>(path: string, form: FormData, token?: string | null): Promise<T> {
+  const res = await fetchWithTimeout(`${API_URL}${path}`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: form,
+  })
+  if (!res.ok) throw await toHttpError(res, `POST ${path} failed`)
+  return res.json() as Promise<T>
+}
+
 export const http = {
   get: <T>(path: string, token?: string | null) => getJson<T>(path, token),
   post: <T>(path: string, body: unknown, token?: string | null) => postJson<T>(path, body, token),
   patch: <T>(path: string, body: unknown, token?: string | null) => patchJson<T>(path, body, token),
   del: <T>(path: string, token?: string | null) => deleteJson<T>(path, token),
+  form: <T>(path: string, form: FormData, token?: string | null) => postForm<T>(path, form, token),
 }
 
 function fetchWithTimeout(url: string, init?: RequestInit) {

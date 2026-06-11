@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient'
-import { router } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { router, useFocusEffect } from 'expo-router'
+import { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Dimensions,
@@ -15,6 +15,7 @@ import type { CaptainHudResponse } from '@lazynavy-v3/types'
 import { IconGlyph } from '../../shared/ui/IconGlyph'
 import { colors } from '../../theme/tokens'
 import { findBadge } from '../identity/badges/catalog'
+import { useAuth } from '../identity/context'
 import { useChatOverlay } from '../messages/ChatOverlay'
 import { createVessel, getCaptainHud } from './api'
 import { fallbackHud } from './fallbackHud'
@@ -31,12 +32,13 @@ export function HomeCaptainHudScreen() {
   const [emptyPreview, setEmptyPreview] = useState(false)
   const [crewSheetOpen, setCrewSheetOpen] = useState(false)
   const chatOverlay = useChatOverlay()
+  const { user } = useAuth()
 
   useEffect(() => {
     let cancelled = false
     setHud(emptyPreview ? { ...fallbackHud, user: null, currentVessel: null, activeVoyage: null, shortcuts: [], sceneTemplate: 'empty_sea' } : fallbackHud)
     setLoading(false)
-    getCaptainHud(emptyPreview)
+    getCaptainHud(emptyPreview, user?.id)
       .then((next) => {
         if (!cancelled) setHud(next)
       })
@@ -46,13 +48,27 @@ export function HomeCaptainHudScreen() {
     return () => {
       cancelled = true
     }
-  }, [emptyPreview])
+  }, [emptyPreview, user?.id])
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false
+      getCaptainHud(emptyPreview, user?.id)
+        .then((next) => {
+          if (!cancelled) setHud(next)
+        })
+        .catch(() => undefined)
+      return () => {
+        cancelled = true
+      }
+    }, [emptyPreview, user?.id]),
+  )
 
   async function handleCreateBoat() {
     try {
       await createVessel('Morning Star')
       setEmptyPreview(false)
-      setHud(await getCaptainHud(false))
+      setHud(await getCaptainHud(false, user?.id))
     } catch {
       setHud(fallbackHud)
       setEmptyPreview(false)
@@ -81,9 +97,21 @@ export function HomeCaptainHudScreen() {
       <View style={styles.safe}>
         {hud.user && (
           <View style={[styles.playerHud, { marginTop: topArea }]}>
-            <View style={styles.avatarWrap}>
-              <View style={styles.avatar}><Text style={styles.avatarText}>{hud.user.nickname.slice(0, 1)}</Text></View>
-            </View>
+            <Pressable
+              style={styles.avatarWrap}
+              onPress={() => router.push('/profile' as never)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="打开我的"
+            >
+              <View style={styles.avatar}>
+                {hud.user.avatarUrl ? (
+                  <Image source={{ uri: hud.user.avatarUrl }} style={styles.avatarImage} resizeMode="cover" />
+                ) : (
+                  <Text style={styles.avatarText}>{hud.user.nickname.slice(0, 1)}</Text>
+                )}
+              </View>
+            </Pressable>
             <View style={styles.playerMain}>
               <View style={styles.playerRow}>
                 <Text numberOfLines={1} style={styles.playerName}>{hud.user.nickname}</Text>
@@ -314,7 +342,8 @@ const styles = StyleSheet.create({
   hull: { position: 'absolute', bottom: 26, left: '18%', right: '11%', height: 30, borderBottomLeftRadius: 34, borderBottomRightRadius: 34, backgroundColor: 'rgba(255,255,255,0.96)', borderBottomWidth: 4, borderBottomColor: '#0f5471' },
   playerHud: { marginLeft: HOME_CONTENT_INSET, marginRight: 80, marginTop: 18, height: 44, paddingLeft: 0, paddingRight: 4, paddingVertical: 0, borderRadius: 22, backgroundColor: 'rgba(255, 255, 255, 0.42)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)', flexDirection: 'row', alignItems: 'center', gap: 8, shadowColor: '#075985', shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
   avatarWrap: { width: 64, height: 64 },
-  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#bfe9ff', borderWidth: 1, borderColor: colors.white, alignItems: 'center', justifyContent: 'center', shadowColor: '#075985', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
+  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#bfe9ff', borderWidth: 1, borderColor: colors.white, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', shadowColor: '#075985', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
+  avatarImage: { width: '100%', height: '100%' },
   avatarText: { color: colors.ink, fontWeight: '900', fontSize: 22 },
   playerMain: { flex: 1 },
   playerRow: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 16 },

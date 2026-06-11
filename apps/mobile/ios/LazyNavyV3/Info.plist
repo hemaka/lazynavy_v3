@@ -45,8 +45,27 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
+    <key>NSFaceIDUsageDescription</key>
+    <string>LazyNavy uses Face ID to unlock your protected app session.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>LazyNavy uses your camera so you can take a profile avatar or background photo.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>LazyNavy uses your location to record voyage and shore visit tracks.</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>LazyNavy uses your location to record voyage and shore visit tracks.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>LazyNavy uses your location to record voyage and shore visit tracks while the app is open.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>LazyNavy uses your photo library so you can choose a profile avatar or background.</string>
+    <key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
+    <true/>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>
+    <key>UIBackgroundModes</key>
+    <array>
+      <string>fetch</string>
+      <string>remote-notification</string>
+    </array>
     <key>UIRequiredDeviceCapabilities</key>
     <array>
       <string>arm64</string>

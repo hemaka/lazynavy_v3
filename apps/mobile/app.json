@@ -13,14 +13,20 @@
       "bundleIdentifier": "com.anonymous.lazynavy-v3",
       "appleTeamId": "N2UQHXDELE",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "LazyNavy uses your location to record voyage and shore visit tracks while the app is open."
+        "NSLocationWhenInUseUsageDescription": "LazyNavy uses your location to record voyage and shore visit tracks while the app is open.",
+        "NSCameraUsageDescription": "LazyNavy uses your camera so you can take a profile avatar or background photo.",
+        "NSPhotoLibraryUsageDescription": "LazyNavy uses your photo library so you can choose a profile avatar or background.",
+        "PHPhotoLibraryPreventAutomaticLimitedAccessAlert": true,
+        "NSFaceIDUsageDescription": "LazyNavy uses Face ID to unlock your protected app session."
       }
     },
     "android": {
       "package": "com.anonymous.lazynavyv3",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "READ_MEDIA_IMAGES",
+        "USE_BIOMETRIC"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",

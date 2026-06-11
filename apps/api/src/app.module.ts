@@ -6,6 +6,7 @@ import { HomeModule } from './modules/home/home.module'
 import { IdentityModule } from './modules/identity/identity.module'
 import { LogsModule } from './modules/logs/logs.module'
 import { ManualsModule } from './modules/manuals/manuals.module'
+import { MediaModule } from './modules/media/media.module'
 import { MessagingModule } from './modules/messaging/messaging.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { PlacesModule } from './modules/places/places.module'
@@ -18,6 +19,6 @@ import { VoyagesModule } from './modules/voyages/voyages.module'
 import { WeatherModule } from './modules/weather/weather.module'
 
 @Module({
-  imports: [PrismaModule, HealthModule, IdentityModule, VesselsModule, VoyagesModule, RewardsModule, LogsModule, PlacesModule, SuppliesModule, EquipmentModule, ManualsModule, MessagingModule, NotificationsModule, SyncModule, ToolboxModule, WeatherModule, HomeModule],
+  imports: [PrismaModule, HealthModule, IdentityModule, VesselsModule, VoyagesModule, RewardsModule, LogsModule, PlacesModule, SuppliesModule, EquipmentModule, ManualsModule, MediaModule, MessagingModule, NotificationsModule, SyncModule, ToolboxModule, WeatherModule, HomeModule],
 })
 export class AppModule {}

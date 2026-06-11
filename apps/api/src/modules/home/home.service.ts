@@ -46,7 +46,7 @@ export class HomeService {
       user: {
         id: user.id,
         nickname: user.nickname,
-        avatarUrl: user.avatarUrl,
+        avatarUrl: user.avatar ?? user.avatarUrl,
         title: user.title,
         level: user.level,
         xp: user.xp,

@@ -44,6 +44,16 @@ export function updateProfileApi(token: string, patch: Partial<AuthUser>) {
   return http.patch<AuthUser>('/users/me', patch, token)
 }
 
+export function uploadProfileMediaApi(token: string, uri: string, kind: 'avatar' | 'cover') {
+  const form = new FormData()
+  form.append('file', {
+    uri,
+    type: 'image/jpeg',
+    name: `${kind}-${Date.now()}.jpg`,
+  } as unknown as Blob)
+  return http.form<{ url: string; filename: string; mimeType: string; fileSize: number }>('/media/upload', form, token)
+}
+
 export function getMyBadgesApi(token: string) {
   return http.get<UserBadgesResponse>('/users/me/badges', token)
 }
