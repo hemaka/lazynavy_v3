@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean, IsInt, Min, Max, MaxLength, IsIn, ValidateIf, IsISO8601 } from 'class-validator'
+import { IsString, IsOptional, IsBoolean, IsInt, Min, Max, MaxLength, IsIn, Matches, ValidateIf } from 'class-validator'
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -59,9 +59,9 @@ export class UpdateProfileDto {
   gender?: string
 
   @IsOptional()
-  @ValidateIf((_, value) => value !== null)
-  @IsISO8601({ strict: true })
-  birthDate?: string | null
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  birthDate?: string
 
   @IsOptional()
   @IsInt()

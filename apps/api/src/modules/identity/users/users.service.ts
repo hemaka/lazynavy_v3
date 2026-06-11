@@ -56,7 +56,7 @@ export class UsersService {
       },
     })
     if (!user) throw new NotFoundException('用户不存在')
-    return user
+    return withComputedAge(user)
   }
 
   async findByEmail(email: string) {
@@ -74,6 +74,9 @@ export class UsersService {
   }
 
   async updateProfile(id: string, dto: UpdateProfileDto) {
+    if (dto.birthDate !== undefined && !isValidBirthDate(dto.birthDate)) {
+      throw new BadRequestException('生日格式不正确')
+    }
     // Verify vessel ownership before persisting — never trust client-supplied id.
     if (dto.currentVesselId) {
       const vessel = await this.prisma.vessel.findFirst({
@@ -86,9 +89,13 @@ export class UsersService {
     if (dto.activeBadgeId) {
       await this.ensureUserCanUseBadge(id, dto.activeBadgeId)
     }
-    return this.prisma.user.update({
+    const { birthDate, ...profileData } = dto
+    const user = await this.prisma.user.update({
       where: { id },
-      data: dto,
+      data: {
+        ...profileData,
+        ...(birthDate !== undefined ? { birthDate: parseBirthDate(birthDate) } : {}),
+      },
       select: {
         id: true,
         nickname: true,
@@ -114,6 +121,7 @@ export class UsersService {
         createdAt: true,
       },
     })
+    return withComputedAge(user)
   }
 
   async listAvailableBadges(userId: string) {
@@ -259,10 +267,62 @@ export class UsersService {
   safeUser(user: any) {
     const { passwordHash, deletedAt, ...safe } = user
     return {
-      ...safe,
+      ...withComputedAge(safe),
       clientConfig: clientConfig(),
     }
   }
+}
+
+function withComputedAge<T extends { birthDate?: Date | string | null }>(user: T) {
+  const birthDate = formatBirthDate(user.birthDate)
+  return {
+    ...user,
+    birthDate,
+    age: calculateAge(birthDate),
+  }
+}
+
+function calculateAge(birthDate?: string | null) {
+  if (!birthDate || isPrivateBirthDate(birthDate)) return null
+  const match = birthDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return null
+  const today = new Date()
+  let age = today.getFullYear() - Number(match[1])
+  const month = Number(match[2]) - 1
+  const day = Number(match[3])
+  if (today.getMonth() < month || (today.getMonth() === month && today.getDate() < day)) age -= 1
+  return age >= 0 && age <= 120 ? age : null
+}
+
+function isValidBirthDate(value: string) {
+  if (isPrivateBirthDate(value)) return true
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  if (year < 1900 || month < 1 || month > 12 || day < 1 || day > 31) return false
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return false
+  const today = new Date()
+  const todayUtc = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()))
+  return date <= todayUtc
+}
+
+function parseBirthDate(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return null
+  return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
+}
+
+function formatBirthDate(value?: Date | string | null) {
+  if (!value) return null
+  if (typeof value === 'string') return value.match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? null
+  return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`
+}
+
+function isPrivateBirthDate(value: string) {
+  return value === '1900-01-01'
 }
 
 function clientConfig() {

@@ -50,6 +50,7 @@ export interface AuthUser {
   uiLanguage?: string | null
   gender?: 'male' | 'female' | 'private' | string
   birthDate?: string | null
+  age?: number | null
   sailingYears?: number | null
   title?: string
   level?: number

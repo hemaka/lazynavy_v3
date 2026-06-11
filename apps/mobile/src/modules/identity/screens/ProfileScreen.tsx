@@ -5,7 +5,8 @@ import * as LocalAuthentication from 'expo-local-authentication'
 import * as MediaLibrary from 'expo-media-library'
 import Constants from 'expo-constants'
 import { useLocalSearchParams } from 'expo-router'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import DateTimePicker from '@react-native-community/datetimepicker'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -31,6 +32,8 @@ import { useAuth } from '../context'
 import type { AuthUser } from '../types'
 import { getMyBadgesApi, setActiveBadgeApi, updateProfileApi, uploadProfileMediaApi } from '../api/client'
 import { findBadge, SYSTEM_BADGE_CATALOG, type BadgeCatalogItem } from '../badges/catalog'
+import { CountryRegionPicker } from '../../../shared/ui/CountryRegionPicker'
+import { ImageSourceActionSheet } from '../../../shared/ui/ImageSourceActionSheet'
 import {
   DEFAULT_PROFILE_SETTINGS,
   loadProfileSettings,
@@ -41,6 +44,8 @@ import { useTheme } from '../../../theme'
 
 type ProfilePanel = 'profile' | 'security' | 'appearance' | 'privacy'
 type MediaKind = 'avatar' | 'cover'
+
+const PRIVATE_BIRTH_DATE = '1900-01-01'
 
 interface MediaEditorState {
   kind: MediaKind
@@ -131,6 +136,7 @@ function SignedInProfile({
   const [biometricTypes, setBiometricTypes] = useState<LocalAuthentication.AuthenticationType[]>([])
   const [savingMedia, setSavingMedia] = useState<MediaKind | null>(null)
   const [mediaEditor, setMediaEditor] = useState<MediaEditorState | null>(null)
+  const [mediaActionKind, setMediaActionKind] = useState<MediaKind | null>(null)
   const [libraryPickerKind, setLibraryPickerKind] = useState<MediaKind | null>(null)
 
   useEffect(() => {
@@ -226,18 +232,8 @@ function SignedInProfile({
 
   const pickProfileImage = useCallback(async (kind: MediaKind) => {
     if (!token) return
-    Alert.alert('添加图片', undefined, [
-      {
-        text: '拍照',
-        onPress: () => void pickFromCamera(kind),
-      },
-      {
-        text: '从相册选择',
-        onPress: () => setLibraryPickerKind(kind),
-      },
-      { text: '取消', style: 'cancel' },
-    ])
-  }, [pickFromCamera, token])
+    setMediaActionKind(kind)
+  }, [token])
 
   const openPickedAsset = useCallback(async (asset: MediaLibrary.Asset, kind: MediaKind) => {
     try {
@@ -369,6 +365,17 @@ function SignedInProfile({
         styles={styles}
         onClose={() => setLibraryPickerKind(null)}
         onSelect={(asset, kind) => void openPickedAsset(asset, kind)}
+      />
+      <ImageSourceActionSheet
+        visible={mediaActionKind !== null}
+        title={mediaActionKind === 'avatar' ? '更换头像' : '更换背景'}
+        onClose={() => setMediaActionKind(null)}
+        onCamera={() => {
+          if (mediaActionKind) void pickFromCamera(mediaActionKind)
+        }}
+        onLibrary={() => {
+          if (mediaActionKind) setLibraryPickerKind(mediaActionKind)
+        }}
       />
     </>
   )
@@ -719,6 +726,8 @@ function SettingsSheet({
   const [draft, setDraft] = useState<Partial<AuthUser>>({})
   const [localDraft, setLocalDraft] = useState<LocalProfileSettings>(settings)
   const [disableProtectionPassword, setDisableProtectionPassword] = useState('')
+  const [birthPickerVisible, setBirthPickerVisible] = useState(false)
+  const [countryPickerVisible, setCountryPickerVisible] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -761,7 +770,7 @@ function SettingsSheet({
           nickname: String(draft.nickname ?? user.nickname).trim() || user.nickname,
           bio: String(draft.bio ?? ''),
           gender: draft.gender,
-          birthDate: normalizeEmpty(draft.birthDate),
+          birthDate: normalizeBirthDateForApi(draft.birthDate),
           country: normalizeEmpty(draft.country),
           region: normalizeEmpty(draft.region),
           firstLanguage: normalizeEmpty(draft.firstLanguage),
@@ -810,29 +819,44 @@ function SettingsSheet({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.badgeModalLayer}>
-        <Pressable style={styles.badgeBackdrop} onPress={onClose} />
-        <View style={styles.settingsSheet}>
-          <View style={styles.sheetHandle} />
-          <View style={styles.badgeSheetHeader}>
-            <Text style={styles.badgeSheetTitle}>{title}</Text>
-            <Pressable style={styles.sheetClose} onPress={onClose}><Text style={styles.sheetCloseText}>×</Text></Pressable>
-          </View>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.settingsContent}>
-            {panel === 'profile' && (
-              <>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View style={styles.settingsScreen}>
+        <View style={styles.settingsNav}>
+          <Pressable style={styles.settingsNavButton} onPress={onClose}>
+            <Text style={styles.settingsNavButtonText}>取消</Text>
+          </Pressable>
+          <Text style={styles.settingsNavTitle}>{title}</Text>
+          <Pressable style={styles.settingsNavButton} onPress={() => void save()} disabled={saving}>
+            <Text style={[styles.settingsNavButtonText, saving && styles.settingsNavButtonDisabled]}>{saving ? '保存中' : '完成'}</Text>
+          </Pressable>
+        </View>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.settingsContent}>
+          {panel === 'profile' && (
+            <>
+              <SettingsGroup styles={styles}>
                 <Field label="昵称" value={String(draft.nickname ?? '')} styles={styles} onChangeText={(nickname) => setDraft((d) => ({ ...d, nickname }))} />
-                <Field label="生日" value={String(draft.birthDate ?? '')} placeholder="YYYY-MM-DD" styles={styles} onChangeText={(birthDate) => setDraft((d) => ({ ...d, birthDate }))} />
-                <Field label="国家或地区" value={String(draft.country ?? '')} styles={styles} onChangeText={(country) => setDraft((d) => ({ ...d, country }))} />
-                <Field label="地区/城市" value={String(draft.region ?? '')} styles={styles} onChangeText={(region) => setDraft((d) => ({ ...d, region }))} />
+                <BirthdayField value={String(draft.birthDate ?? '')} styles={styles} onPress={() => setBirthPickerVisible(true)} />
+                <CountryRegionField
+                  country={String(draft.country ?? '')}
+                  region={String(draft.region ?? '')}
+                  styles={styles}
+                  onPress={() => setCountryPickerVisible(true)}
+                />
+              </SettingsGroup>
+              <SettingsGroup styles={styles}>
                 <Segment label="性别" value={String(draft.gender ?? 'private')} options={[['private', '保密'], ['male', '男'], ['female', '女']]} styles={styles} onChange={(gender) => setDraft((d) => ({ ...d, gender }))} />
+              </SettingsGroup>
+              <SettingsGroup styles={styles}>
                 <Field label="个人简介" value={String(draft.bio ?? '')} multiline styles={styles} onChangeText={(bio) => setDraft((d) => ({ ...d, bio }))} />
-              </>
-            )}
-            {panel === 'security' && (
-              <>
+              </SettingsGroup>
+            </>
+          )}
+          {panel === 'security' && (
+            <>
+              <SettingsGroup styles={styles}>
                 <Segment label="2FA" value={localDraft.twoFactorMethod} options={[['off', '关闭'], ['email', '邮箱'], ['authenticator', '验证器']]} styles={styles} onChange={(twoFactorMethod) => setLocalDraft((d) => ({ ...d, twoFactorMethod: twoFactorMethod as LocalProfileSettings['twoFactorMethod'] }))} />
+              </SettingsGroup>
+              <SettingsGroup styles={styles}>
                 <SettingToggle label="后台打开需要保护密码" value={localDraft.appLockEnabled} styles={styles} onValueChange={(appLockEnabled) => setLocalDraft((d) => ({ ...d, appLockEnabled }))} />
                 {localDraft.appLockEnabled ? (
                   <Field label="保护密码" value={localDraft.appLockPassword} secureTextEntry styles={styles} onChangeText={(appLockPassword) => setLocalDraft((d) => ({ ...d, appLockPassword }))} />
@@ -841,23 +865,33 @@ function SettingsSheet({
                 ) : null}
                 <SettingToggle label="面部解锁" value={localDraft.appLockEnabled && localDraft.faceUnlockEnabled && hasFace} disabled={!localDraft.appLockEnabled || !hasFace} styles={styles} onValueChange={(faceUnlockEnabled) => setLocalDraft((d) => ({ ...d, faceUnlockEnabled }))} />
                 <SettingToggle label="指纹解锁" value={localDraft.appLockEnabled && localDraft.fingerprintUnlockEnabled && hasFingerprint} disabled={!localDraft.appLockEnabled || !hasFingerprint} styles={styles} onValueChange={(fingerprintUnlockEnabled) => setLocalDraft((d) => ({ ...d, fingerprintUnlockEnabled }))} />
-                <InfoNote text="修改密码入口已预留，后端密码修改接口接入后会从这里进入。" styles={styles} />
-              </>
-            )}
-            {panel === 'appearance' && (
-              <>
+              </SettingsGroup>
+              <InfoNote text="修改密码入口已预留，后端密码修改接口接入后会从这里进入。" styles={styles} />
+            </>
+          )}
+          {panel === 'appearance' && (
+            <>
+              <SettingsGroup styles={styles}>
                 <Segment label="颜色主题" value={localDraft.colorTheme} options={[['ocean', '海洋'], ['light', '浅色'], ['dark', '深色'], ['system', '跟随系统']]} styles={styles} onChange={(colorTheme) => setLocalDraft((d) => ({ ...d, colorTheme: colorTheme as LocalProfileSettings['colorTheme'] }))} />
+              </SettingsGroup>
+              <SettingsGroup styles={styles}>
                 <Field label="说话语言" value={localDraft.speechLanguage} styles={styles} onChangeText={(speechLanguage) => setLocalDraft((d) => ({ ...d, speechLanguage }))} />
                 <Field label="界面语言" value={localDraft.uiLanguage} styles={styles} onChangeText={(uiLanguage) => setLocalDraft((d) => ({ ...d, uiLanguage }))} />
-              </>
-            )}
-            {panel === 'privacy' && (
-              <>
+              </SettingsGroup>
+            </>
+          )}
+          {panel === 'privacy' && (
+            <>
+              <SettingsGroup styles={styles}>
                 <Segment label="谁能看我" value={localDraft.whoCanViewMe} options={[['everyone', '所有人'], ['friends', '好友'], ['crew', '船员'], ['private', '仅自己']]} styles={styles} onChange={(whoCanViewMe) => setLocalDraft((d) => ({ ...d, whoCanViewMe: whoCanViewMe as LocalProfileSettings['whoCanViewMe'] }))} />
                 <Segment label="谁能加我" value={localDraft.whoCanAddMe} options={[['everyone', '所有人'], ['friends', '好友'], ['crew', '船员'], ['private', '关闭']]} styles={styles} onChange={(whoCanAddMe) => setLocalDraft((d) => ({ ...d, whoCanAddMe: whoCanAddMe as LocalProfileSettings['whoCanAddMe'] }))} />
+              </SettingsGroup>
+              <SettingsGroup styles={styles}>
                 <SettingToggle label="允许被搜索到" value={localDraft.searchable} styles={styles} onValueChange={(searchable) => setLocalDraft((d) => ({ ...d, searchable }))} />
                 <SettingToggle label="公开资料页" value={!!draft.isPublic} styles={styles} onValueChange={(isPublic) => setDraft((d) => ({ ...d, isPublic }))} />
                 <Segment label="位置展示" value={String(draft.locationPolicy ?? 'region')} options={[['exact', '精确'], ['region', '地区'], ['hidden', '隐藏']]} styles={styles} onChange={(locationPolicy) => setDraft((d) => ({ ...d, locationPolicy }))} />
+              </SettingsGroup>
+              <SettingsGroup styles={styles}>
                 {(['avatar', 'bio', 'region', 'badges'] as const).map((field) => (
                   <SettingToggle
                     key={field}
@@ -867,16 +901,39 @@ function SettingsSheet({
                     onValueChange={(enabled) => setLocalDraft((d) => ({ ...d, visibleFields: toggleItem(d.visibleFields, field, enabled) }))}
                   />
                 ))}
-              </>
-            )}
-          </ScrollView>
-          <Pressable style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={() => void save()} disabled={saving}>
-            <Text style={styles.saveButtonText}>{saving ? '保存中...' : '保存'}</Text>
-          </Pressable>
-        </View>
+              </SettingsGroup>
+            </>
+          )}
+        </ScrollView>
+        {panel === 'profile' && (
+          <>
+            <BirthDatePicker
+              visible={birthPickerVisible}
+              value={String(draft.birthDate ?? '')}
+              styles={styles}
+              onClose={() => setBirthPickerVisible(false)}
+              onPrivate={() => setDraft((d) => ({ ...d, birthDate: PRIVATE_BIRTH_DATE }))}
+              onChange={(birthDate) => setDraft((d) => ({ ...d, birthDate }))}
+            />
+            <CountryRegionPicker
+              visible={countryPickerVisible}
+              country={String(draft.country ?? '')}
+              region={String(draft.region ?? '')}
+              onClose={() => setCountryPickerVisible(false)}
+              onChange={({ country, region }) => setDraft((d) => ({ ...d, country, region }))}
+            />
+          </>
+        )}
       </View>
     </Modal>
   )
+}
+
+function SettingsGroup({ children, styles }: {
+  children: ReactNode
+  styles: ReturnType<typeof createStyles>
+}) {
+  return <View style={styles.settingsGroup}>{children}</View>
 }
 
 function Field({ label, value, placeholder, multiline, secureTextEntry, styles, onChangeText }: {
@@ -901,6 +958,95 @@ function Field({ label, value, placeholder, multiline, secureTextEntry, styles, 
         onChangeText={onChangeText}
       />
     </View>
+  )
+}
+
+function BirthdayField({ value, styles, onPress }: {
+  value: string
+  styles: ReturnType<typeof createStyles>
+  onPress: () => void
+}) {
+  const displayValue = formatBirthDateDisplay(value)
+  const privateDate = isPrivateBirthDate(value)
+  return (
+    <Pressable style={styles.fieldWrap} onPress={onPress}>
+      <Text style={styles.fieldLabel}>生日</Text>
+      <Text style={[styles.dateValue, !displayValue && !privateDate && styles.datePlaceholder]}>{privateDate ? '保密' : displayValue || '选择日期'}</Text>
+      <Text style={styles.settingsChevron}>›</Text>
+    </Pressable>
+  )
+}
+
+function CountryRegionField({ country, region, styles, onPress }: {
+  country: string
+  region: string
+  styles: ReturnType<typeof createStyles>
+  onPress: () => void
+}) {
+  const value = [country, region].filter(Boolean).join(' · ')
+  return (
+    <Pressable style={styles.fieldWrap} onPress={onPress}>
+      <Text style={styles.fieldLabel}>国家和地区</Text>
+      <Text style={[styles.dateValue, !value && styles.datePlaceholder]}>{value || '选择国家和地区'}</Text>
+      <Text style={styles.settingsChevron}>›</Text>
+    </Pressable>
+  )
+}
+
+function BirthDatePicker({ visible, value, styles, onClose, onPrivate, onChange }: {
+  visible: boolean
+  value: string
+  styles: ReturnType<typeof createStyles>
+  onClose: () => void
+  onPrivate: () => void
+  onChange: (value: string) => void
+}) {
+  const [selectedDate, setSelectedDate] = useState(dateFromBirthValue(value))
+
+  useEffect(() => {
+    if (!visible) return
+    setSelectedDate(dateFromBirthValue(value))
+  }, [value, visible])
+
+  function confirm() {
+    onChange(formatBirthDate(selectedDate))
+    onClose()
+  }
+
+  function setPrivate() {
+    onPrivate()
+    onClose()
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.datePickerLayer}>
+        <Pressable style={styles.datePickerBackdrop} onPress={onClose} />
+        <View style={styles.datePickerSheet}>
+          <View style={styles.datePickerToolbar}>
+            <Pressable style={styles.datePickerToolbarButton} onPress={setPrivate}>
+              <Text style={styles.datePickerClearText}>保密</Text>
+            </Pressable>
+            <Text style={styles.datePickerTitle}>选择生日</Text>
+            <Pressable style={styles.datePickerToolbarButton} onPress={confirm}>
+              <Text style={styles.datePickerDoneText}>完成</Text>
+            </Pressable>
+          </View>
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display="spinner"
+            locale="zh-Hans"
+            maximumDate={new Date()}
+            minimumDate={new Date(1900, 0, 1)}
+            onChange={(_, date) => {
+              if (date) setSelectedDate(date)
+            }}
+            style={styles.datePicker}
+          />
+        </View>
+      </View>
+    </Modal>
   )
 }
 
@@ -1039,8 +1185,7 @@ function BadgeOption({
   return (
     <Pressable style={[styles.badgeOption, active && styles.badgeOptionActive]} onPress={onPress} disabled={saving}>
       <Image source={badge.image} style={styles.badgeOptionImage} resizeMode="contain" />
-      <Text numberOfLines={1} style={styles.badgeOptionTitle}>{badge.title}</Text>
-      <Text numberOfLines={2} style={styles.badgeOptionDesc}>{badge.description}</Text>
+      <Text numberOfLines={2} style={styles.badgeOptionTitle}>{badge.title}</Text>
       <View style={[styles.badgeState, active && styles.badgeStateActive]}>
         <Text style={[styles.badgeStateText, active && styles.badgeStateTextActive]}>{saving ? '保存中' : active ? '佩戴中' : '选择'}</Text>
       </View>
@@ -1072,6 +1217,12 @@ function ageText(birthDate?: string | null) {
 function normalizeEmpty(value: unknown) {
   const clean = String(value ?? '').trim()
   return clean.length > 0 ? clean : null
+}
+
+function normalizeBirthDateForApi(value: unknown) {
+  const displayDate = formatBirthDateDisplay(String(value ?? '').trim())
+  if (displayDate) return displayDate
+  return PRIVATE_BIRTH_DATE
 }
 
 function getImageSize(uri: string) {
@@ -1162,6 +1313,7 @@ function privacySummary(settings: LocalProfileSettings, user: AuthUser) {
 }
 
 function calculateAge(birthDate?: string | null) {
+  if (isPrivateBirthDate(birthDate)) return null
   const match = String(birthDate ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (!match) return null
   const today = new Date()
@@ -1170,6 +1322,30 @@ function calculateAge(birthDate?: string | null) {
   const day = Number(match[3])
   if (today.getMonth() < month || (today.getMonth() === month && today.getDate() < day)) age -= 1
   return age >= 0 && age <= 120 ? age : null
+}
+
+function dateFromBirthValue(value?: string | null) {
+  if (isPrivateBirthDate(value)) return new Date(2000, 0, 1)
+  const match = String(value ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!match) return new Date(2000, 0, 1)
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+}
+
+function formatBirthDateDisplay(value?: string | null) {
+  if (isPrivateBirthDate(value)) return ''
+  const match = String(value ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/)
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : ''
+}
+
+function isPrivateBirthDate(value?: string | null) {
+  return String(value ?? '').trim() === PRIVATE_BIRTH_DATE
+}
+
+function formatBirthDate(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function createStyles(t: ReturnType<typeof useTheme>) {
@@ -1235,17 +1411,22 @@ function createStyles(t: ReturnType<typeof useTheme>) {
       borderWidth: 0.5,
       borderColor: t.border,
     },
-    settingsSheet: {
-      maxHeight: '88%',
-      paddingHorizontal: 16,
-      paddingTop: 8,
-      paddingBottom: 18,
-      borderTopLeftRadius: 22,
-      borderTopRightRadius: 22,
-      backgroundColor: t.surface,
-      borderWidth: 0.5,
-      borderColor: t.border,
+    settingsScreen: { flex: 1, backgroundColor: '#f2f2f7' },
+    settingsNav: {
+      height: 104,
+      paddingTop: 58,
+      paddingHorizontal: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: 0.5,
+      borderBottomColor: 'rgba(60,60,67,0.22)',
+      backgroundColor: 'rgba(248,248,248,0.94)',
     },
+    settingsNavButton: { minWidth: 58, height: 40, justifyContent: 'center' },
+    settingsNavButtonText: { color: '#007aff', fontSize: 17, fontWeight: '600' },
+    settingsNavButtonDisabled: { opacity: 0.45 },
+    settingsNavTitle: { color: '#111', fontSize: 17, fontWeight: '700' },
     cropSheet: {},
     sheetHandle: { alignSelf: 'center', width: 42, height: 4, borderRadius: 2, backgroundColor: t.borderStrong, marginBottom: 12 },
     badgeSheetHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14, marginBottom: 14 },
@@ -1254,11 +1435,12 @@ function createStyles(t: ReturnType<typeof useTheme>) {
     sheetClose: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: t.surfaceAlt },
     sheetCloseText: { color: t.text, fontSize: 22, fontWeight: '800', lineHeight: 24 },
     badgeList: { paddingBottom: 14 },
-    badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     badgeOption: {
-      width: '48%',
-      minHeight: 188,
-      padding: 10,
+      width: '31.8%',
+      minHeight: 134,
+      paddingHorizontal: 6,
+      paddingVertical: 9,
       borderRadius: 14,
       backgroundColor: t.surfaceAlt,
       borderWidth: 1,
@@ -1266,10 +1448,9 @@ function createStyles(t: ReturnType<typeof useTheme>) {
       alignItems: 'center',
     },
     badgeOptionActive: { borderColor: t.accent, backgroundColor: 'rgba(0,119,182,0.08)' },
-    badgeOptionImage: { width: 72, height: 72, marginBottom: 7 },
-    badgeOptionTitle: { color: t.text, fontSize: 13, fontWeight: '900', maxWidth: '100%' },
-    badgeOptionDesc: { color: t.textDim, fontSize: 11, lineHeight: 15, textAlign: 'center', marginTop: 4, minHeight: 30 },
-    badgeState: { marginTop: 9, minWidth: 62, height: 26, paddingHorizontal: 10, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(18,48,71,0.08)' },
+    badgeOptionImage: { width: 58, height: 58, marginBottom: 7 },
+    badgeOptionTitle: { color: t.text, fontSize: 12, lineHeight: 15, fontWeight: '900', maxWidth: '100%', minHeight: 30, textAlign: 'center' },
+    badgeState: { marginTop: 8, minWidth: 52, height: 24, paddingHorizontal: 8, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(18,48,71,0.08)' },
     badgeStateActive: { backgroundColor: t.accent },
     badgeStateText: { color: t.textDim, fontSize: 11, fontWeight: '800' },
     badgeStateTextActive: { color: '#fff' },
@@ -1277,20 +1458,75 @@ function createStyles(t: ReturnType<typeof useTheme>) {
     clearBadgeText: { color: t.text, fontSize: 13, fontWeight: '800' },
     badgeError: { color: t.danger, fontSize: 12, fontWeight: '700', marginTop: 10 },
     badgeLoading: { color: t.textDim, fontSize: 12, fontWeight: '700', marginBottom: 10 },
-    settingsContent: { paddingBottom: 12, gap: 12 },
-    fieldWrap: { gap: 8 },
-    fieldLabel: { color: t.textDim, fontSize: 12, fontWeight: '800' },
-    input: { minHeight: 46, borderRadius: 12, borderWidth: 0.5, borderColor: t.border, backgroundColor: t.surfaceAlt, color: t.text, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontWeight: '600' },
-    inputMultiline: { minHeight: 88, textAlignVertical: 'top' },
-    segmentRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    segmentButton: { minHeight: 38, borderRadius: 12, borderWidth: 0.5, borderColor: t.border, backgroundColor: t.surfaceAlt, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
-    segmentButtonActive: { borderColor: t.accent, backgroundColor: 'rgba(0,119,182,0.1)' },
-    segmentText: { color: t.textDim, fontSize: 13, fontWeight: '800' },
-    segmentTextActive: { color: t.accent },
-    toggleRow: { minHeight: 50, borderRadius: 12, borderWidth: 0.5, borderColor: t.border, backgroundColor: t.surfaceAlt, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+    settingsContent: { paddingHorizontal: 16, paddingTop: 28, paddingBottom: 48, gap: 26 },
+    settingsGroup: {
+      borderRadius: 12,
+      overflow: 'hidden',
+      backgroundColor: '#fff',
+      borderWidth: 0.5,
+      borderColor: 'rgba(60,60,67,0.12)',
+    },
+    fieldWrap: {
+      minHeight: 48,
+      paddingLeft: 16,
+      paddingRight: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderBottomWidth: 0.5,
+      borderBottomColor: 'rgba(60,60,67,0.18)',
+      backgroundColor: '#fff',
+      gap: 14,
+    },
+    fieldLabel: { width: 102, color: '#111', fontSize: 16, fontWeight: '400' },
+    input: { flex: 1, minHeight: 48, color: '#111', paddingHorizontal: 0, paddingVertical: 10, fontSize: 16, fontWeight: '400', textAlign: 'right' },
+    inputMultiline: { minHeight: 104, paddingTop: 13, textAlign: 'left', textAlignVertical: 'top' },
+    dateValue: { flex: 1, color: '#111', fontSize: 16, fontWeight: '400', textAlign: 'right' },
+    datePlaceholder: { color: 'rgba(60,60,67,0.46)' },
+    settingsChevron: { color: 'rgba(60,60,67,0.32)', fontSize: 26, fontWeight: '300', lineHeight: 28 },
+    segmentRow: { flex: 1, minHeight: 32, flexDirection: 'row', padding: 2, borderRadius: 8, backgroundColor: 'rgba(118,118,128,0.16)' },
+    segmentButton: { flex: 1, minHeight: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+    segmentButtonActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } },
+    segmentText: { color: '#3c3c43', fontSize: 13, fontWeight: '600' },
+    segmentTextActive: { color: '#111' },
+    toggleRow: {
+      minHeight: 50,
+      paddingLeft: 16,
+      paddingRight: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      borderBottomWidth: 0.5,
+      borderBottomColor: 'rgba(60,60,67,0.18)',
+      backgroundColor: '#fff',
+    },
     toggleRowDisabled: { opacity: 0.55 },
-    toggleLabel: { flex: 1, color: t.text, fontSize: 14, fontWeight: '800' },
-    infoNote: { color: t.textDim, fontSize: 12, lineHeight: 18, fontWeight: '700' },
+    toggleLabel: { flex: 1, color: '#111', fontSize: 16, fontWeight: '400' },
+    infoNote: { marginTop: -18, paddingHorizontal: 16, color: 'rgba(60,60,67,0.72)', fontSize: 13, lineHeight: 18, fontWeight: '400' },
+    datePickerLayer: { flex: 1, justifyContent: 'flex-end' },
+    datePickerBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.28)' },
+    datePickerSheet: {
+      paddingBottom: 26,
+      borderTopLeftRadius: 18,
+      borderTopRightRadius: 18,
+      overflow: 'hidden',
+      backgroundColor: '#f2f2f7',
+    },
+    datePickerToolbar: {
+      height: 50,
+      paddingHorizontal: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: 0.5,
+      borderBottomColor: 'rgba(60,60,67,0.22)',
+      backgroundColor: 'rgba(248,248,248,0.94)',
+    },
+    datePickerToolbarButton: { minWidth: 56, height: 44, justifyContent: 'center' },
+    datePickerTitle: { color: '#111', fontSize: 16, fontWeight: '700' },
+    datePickerClearText: { color: '#ff3b30', fontSize: 16, fontWeight: '500' },
+    datePickerDoneText: { color: '#007aff', fontSize: 16, fontWeight: '700', textAlign: 'right' },
+    datePicker: { alignSelf: 'stretch', height: 216 },
     photoPickerScreen: { flex: 1, backgroundColor: '#000' },
     photoPickerHeader: { height: 96, paddingTop: 46, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.16)' },
     photoPickerHeaderButton: { width: 72, height: 38, justifyContent: 'center' },

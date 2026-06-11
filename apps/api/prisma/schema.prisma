@@ -37,7 +37,7 @@ model User {
   textLanguage           String?
   uiLanguage             String?
   gender                 String     @default("private")
-  birthDate              DateTime?
+  birthDate              DateTime?  @db.Date
   sailingYears           Int?
   title                  String     @default("Harbor Rookie")
   level                  Int        @default(1)
