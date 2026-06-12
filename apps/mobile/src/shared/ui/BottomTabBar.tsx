@@ -1,5 +1,6 @@
 import { usePathname } from 'expo-router'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useRef } from 'react'
+import { Animated, Pressable, StyleSheet, Text } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { bottomNav, isBottomNavActive } from '../../navigation/navConfig'
 import { useBottomNavTransition } from '../../navigation/bottomNavTransition'
@@ -9,11 +10,23 @@ import { IconGlyph } from './IconGlyph'
 export function BottomTabBar() {
   const insets = useSafeAreaInsets()
   const pathname = usePathname()
-  const { navigateBottomNav } = useBottomNavTransition()
+  const { bottomNavHidden, navigateBottomNav } = useBottomNavTransition()
   const bottom = Math.max(insets.bottom, 8)
+  const navTranslateY = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    Animated.timing(navTranslateY, {
+      toValue: bottomNavHidden ? bottom + 86 : 0,
+      duration: bottomNavHidden ? 220 : 260,
+      useNativeDriver: true,
+    }).start()
+  }, [bottom, bottomNavHidden, navTranslateY])
 
   return (
-    <View style={[styles.bottomNav, { bottom }]}>
+    <Animated.View
+      pointerEvents={bottomNavHidden ? 'none' : 'auto'}
+      style={[styles.bottomNav, { bottom, transform: [{ translateY: navTranslateY }] }]}
+    >
       {bottomNav.map((item, index) => {
         const active = isBottomNavActive(pathname, item.href)
         return (
@@ -29,7 +42,7 @@ export function BottomTabBar() {
           </Pressable>
         )
       })}
-    </View>
+    </Animated.View>
   )
 }
 

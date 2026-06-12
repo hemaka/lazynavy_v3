@@ -47,6 +47,10 @@ export function listPoisApi(filters?: {
   lat?: number
   lng?: number
   zoom?: number
+  minLat?: number
+  maxLat?: number
+  minLng?: number
+  maxLng?: number
 }) {
   const params = new URLSearchParams()
   if (filters?.category && filters.category !== 'all') params.set('category', filters.category)
@@ -55,6 +59,10 @@ export function listPoisApi(filters?: {
   if (typeof filters?.lat === 'number') params.set('lat', String(filters.lat))
   if (typeof filters?.lng === 'number') params.set('lng', String(filters.lng))
   if (typeof filters?.zoom === 'number') params.set('zoom', String(filters.zoom))
+  if (typeof filters?.minLat === 'number') params.set('minLat', String(filters.minLat))
+  if (typeof filters?.maxLat === 'number') params.set('maxLat', String(filters.maxLat))
+  if (typeof filters?.minLng === 'number') params.set('minLng', String(filters.minLng))
+  if (typeof filters?.maxLng === 'number') params.set('maxLng', String(filters.maxLng))
   const query = params.toString()
   return http.get<POI[]>(query ? `/pois?${query}` : '/pois')
 }
@@ -70,6 +78,10 @@ export function listPoiSummariesApi(filters?: {
   lat?: number
   lng?: number
   zoom?: number
+  minLat?: number
+  maxLat?: number
+  minLng?: number
+  maxLng?: number
 }) {
   const params = new URLSearchParams()
   if (filters?.category && filters.category !== 'all') params.set('category', filters.category)
@@ -78,6 +90,10 @@ export function listPoiSummariesApi(filters?: {
   if (typeof filters?.lat === 'number') params.set('lat', String(filters.lat))
   if (typeof filters?.lng === 'number') params.set('lng', String(filters.lng))
   if (typeof filters?.zoom === 'number') params.set('zoom', String(filters.zoom))
+  if (typeof filters?.minLat === 'number') params.set('minLat', String(filters.minLat))
+  if (typeof filters?.maxLat === 'number') params.set('maxLat', String(filters.maxLat))
+  if (typeof filters?.minLng === 'number') params.set('minLng', String(filters.minLng))
+  if (typeof filters?.maxLng === 'number') params.set('maxLng', String(filters.maxLng))
   const query = params.toString()
   return http.get<PoiRegionSummary[]>(query ? `/pois/summary?${query}` : '/pois/summary')
 }

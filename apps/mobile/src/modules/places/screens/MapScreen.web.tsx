@@ -18,7 +18,6 @@ const LEAFLET_FIXES_ID = 'lazynavy-leaflet-layout-fixes'
 const DEFAULT_CENTER: [number, number] = [38.463, 14.9672]
 const SUMMARY_ZOOM = 4
 const DETAIL_ZOOM = 9
-const CENTER_FETCH_ZOOM = 6
 const DEFAULT_MAP_STYLE = 'standard'
 const DEFAULT_RECENT_SEARCHES = ['亚龙湾', '三亚湾码头', '可预订锚地']
 const COMMON_TAGS = ['补给', '燃油', '餐厅', '修船', '淡水', '避风']
@@ -198,7 +197,6 @@ export default function MapScreenWeb() {
   const [savedPoiIds, setSavedPoiIds] = useState<string[]>([])
   const shouldReadSummaries = zoom >= SUMMARY_ZOOM
   const shouldReadPois = zoom >= DETAIL_ZOOM
-  const shouldFetchByCenter = zoom >= CENTER_FETCH_ZOOM
   const isPhone = viewportWidth < 720
 
   function clearMarkers() {
@@ -363,6 +361,7 @@ export default function MapScreenWeb() {
 
   useEffect(() => {
     if (status !== 'ready') return
+    const map = leafletMapRef.current
 
     if (!shouldReadSummaries) {
       setSummaries([])
@@ -380,14 +379,19 @@ export default function MapScreenWeb() {
       setLoadingPois(true)
       setPoiError(null)
       try {
+        const bounds = query.trim() ? null : map?.getBounds?.()
         const baseFilters = {
           category: filter,
           q: query.trim() || undefined,
-          ...(shouldFetchByCenter
+          ...(bounds
             ? {
                 lat: center[0],
                 lng: center[1],
                 zoom,
+                minLat: bounds.getSouth(),
+                maxLat: bounds.getNorth(),
+                minLng: bounds.getWest(),
+                maxLng: bounds.getEast(),
               }
             : {}),
         }
@@ -424,7 +428,7 @@ export default function MapScreenWeb() {
     return () => {
       cancelled = true
     }
-  }, [center, filter, query, shouldFetchByCenter, shouldReadPois, shouldReadSummaries, status, zoom])
+  }, [boundsVersion, center, filter, query, shouldReadPois, shouldReadSummaries, status, zoom])
 
   useEffect(() => {
     if (status !== 'ready' || !leafletMapRef.current) return
@@ -544,6 +548,21 @@ export default function MapScreenWeb() {
       justifyContent: 'center',
       cursor: 'pointer',
       color: '#64748b',
+    },
+    zoomBadge: {
+      position: 'absolute' as const,
+      left: 18,
+      bottom: 18,
+      zIndex: 620,
+      borderRadius: 14,
+      background: 'rgba(255,255,255,0.9)',
+      border: '1px solid rgba(148,163,184,0.28)',
+      boxShadow: '0 8px 20px rgba(148,163,184,0.16)',
+      color: '#334155',
+      fontSize: 11,
+      fontWeight: 800,
+      padding: '7px 10px',
+      pointerEvents: 'none' as const,
     },
     searchCard: {
       padding: '0 14px 0 20px',
@@ -1467,6 +1486,8 @@ export default function MapScreenWeb() {
             <path d='M15.5 7.5V19.5' stroke='currentColor' strokeWidth='1.6' />
           </svg>
         </button>
+
+        <div style={styles.zoomBadge}>zoom {zoom} · {shouldReadPois ? 'detail' : shouldReadSummaries ? 'summary' : 'none'}</div>
 
         {status === 'error' ? (
           <div style={styles.error}>{text('地图脚本加载失败，请刷新后重试。')}</div>

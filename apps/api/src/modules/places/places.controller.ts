@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common'
 import { IdentityService } from '../identity/identity.service'
+import { JwtAuthGuard } from '../identity/auth/guards/jwt-auth.guard'
 import { AddPoiNoteInput, CreateDiscoveryPointInput, CreatePoiInput, PlacesService, UpsertPoiReviewInput, UnlockDiscoveryInput } from './places.service'
 
 @Controller()
@@ -17,6 +18,10 @@ export class PlacesController {
     @Query('lat') lat?: string,
     @Query('lng') lng?: string,
     @Query('zoom') zoom?: string,
+    @Query('minLat') minLat?: string,
+    @Query('maxLat') maxLat?: string,
+    @Query('minLng') minLng?: string,
+    @Query('maxLng') maxLng?: string,
   ) {
     return this.places.listPois({
       category,
@@ -25,23 +30,37 @@ export class PlacesController {
       lat: lat ? Number(lat) : undefined,
       lng: lng ? Number(lng) : undefined,
       zoom: zoom ? Number(zoom) : undefined,
+      minLat: minLat ? Number(minLat) : undefined,
+      maxLat: maxLat ? Number(maxLat) : undefined,
+      minLng: minLng ? Number(minLng) : undefined,
+      maxLng: maxLng ? Number(maxLng) : undefined,
     })
   }
 
   @Get('pois/summary')
   listPoiSummaries(
     @Query('category') category?: string,
+    @Query('q') q?: string,
     @Query('limit') limit?: string,
     @Query('lat') lat?: string,
     @Query('lng') lng?: string,
     @Query('zoom') zoom?: string,
+    @Query('minLat') minLat?: string,
+    @Query('maxLat') maxLat?: string,
+    @Query('minLng') minLng?: string,
+    @Query('maxLng') maxLng?: string,
   ) {
     return this.places.listPoiSummaries({
       category,
+      q,
       limit: limit ? Number(limit) : undefined,
       lat: lat ? Number(lat) : undefined,
       lng: lng ? Number(lng) : undefined,
       zoom: zoom ? Number(zoom) : undefined,
+      minLat: minLat ? Number(minLat) : undefined,
+      maxLat: maxLat ? Number(maxLat) : undefined,
+      minLng: minLng ? Number(minLng) : undefined,
+      maxLng: maxLng ? Number(maxLng) : undefined,
     })
   }
 
@@ -70,15 +89,15 @@ export class PlacesController {
   }
 
   @Post('pois/:id/notes')
-  async addPoiNote(@Param('id') id: string, @Body() body: AddPoiNoteInput, @Query('userId') userId?: string) {
-    const user = userId ? await this.identity.getUser(userId) : await this.identity.getOrCreateDevUser()
-    if (!user) throw new Error('User not found')
-    return this.places.addPoiNote(id, user.id, body)
+  @UseGuards(JwtAuthGuard)
+  addPoiNote(@Param('id') id: string, @Body() body: AddPoiNoteInput, @Request() req: any) {
+    return this.places.addPoiNote(id, req.user.id, body)
   }
 
   @Delete('pois/:id/notes/:noteId')
-  deletePoiNote(@Param('id') id: string, @Param('noteId') noteId: string) {
-    return this.places.deletePoiNote(id, noteId)
+  @UseGuards(JwtAuthGuard)
+  deletePoiNote(@Param('id') id: string, @Param('noteId') noteId: string, @Request() req: any) {
+    return this.places.deletePoiNote(id, noteId, req.user.id)
   }
 
   @Get('pois/:id/reviews')
@@ -87,40 +106,45 @@ export class PlacesController {
   }
 
   @Get('pois/:id/reviews/me')
-  myPoiReview() {
-    return null
+  @UseGuards(JwtAuthGuard)
+  myPoiReview(@Param('id') id: string, @Request() req: any) {
+    return this.places.getMyPoiReview(id, req.user.id)
   }
 
   @Post('pois/:id/reviews')
-  async upsertPoiReview(@Param('id') id: string, @Body() body: UpsertPoiReviewInput, @Query('userId') userId?: string) {
-    const user = userId ? await this.identity.getUser(userId) : await this.identity.getOrCreateDevUser()
-    if (!user) throw new Error('User not found')
-    return this.places.upsertPoiReview(id, user.id, body)
+  @UseGuards(JwtAuthGuard)
+  upsertPoiReview(@Param('id') id: string, @Body() body: UpsertPoiReviewInput, @Request() req: any) {
+    return this.places.upsertPoiReview(id, req.user.id, body)
   }
 
   @Delete('pois/:id/reviews/me')
-  deletePoiReview() {
-    return { ok: true }
+  @UseGuards(JwtAuthGuard)
+  deletePoiReview(@Param('id') id: string, @Request() req: any) {
+    return this.places.deletePoiReview(id, req.user.id)
   }
 
   @Get('pois/:id/favorite')
-  isPoiFavorited() {
-    return { favorited: false }
+  @UseGuards(JwtAuthGuard)
+  isPoiFavorited(@Param('id') id: string, @Request() req: any) {
+    return this.places.isPoiFavorited(id, req.user.id)
   }
 
   @Post('pois/:id/favorite')
-  addPoiFavorite() {
-    return { favorited: true }
+  @UseGuards(JwtAuthGuard)
+  addPoiFavorite(@Param('id') id: string, @Request() req: any) {
+    return this.places.addPoiFavorite(id, req.user.id)
   }
 
   @Delete('pois/:id/favorite')
-  removePoiFavorite() {
-    return { favorited: false }
+  @UseGuards(JwtAuthGuard)
+  removePoiFavorite(@Param('id') id: string, @Request() req: any) {
+    return this.places.removePoiFavorite(id, req.user.id)
   }
 
   @Get('pois/mine/favorites')
-  listFavoritePois() {
-    return []
+  @UseGuards(JwtAuthGuard)
+  listFavoritePois(@Request() req: any) {
+    return this.places.listFavoritePois(req.user.id)
   }
 
   @Get('discovery-points')

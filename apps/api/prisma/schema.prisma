@@ -69,6 +69,9 @@ model User {
   chatMessages       ChatMessage[]
   activeBadge        Badge?              @relation("UserActiveBadge", fields: [activeBadgeId], references: [id], onDelete: SetNull)
   availableBadges    UserBadge[]
+  poiNotes           PoiNote[]
+  poiReviews         PoiReview[]
+  poiFavorites       PoiFavorite[]
 
   manager      User?  @relation("ManagedAccounts", fields: [managedById], references: [id])
   managedUsers User[] @relation("ManagedAccounts")
@@ -338,24 +341,90 @@ model LogEntry {
 }
 
 model Poi {
-  id           String   @id @default(uuid())
-  name         String
-  type         String
-  scope        String   @default("public")
-  status       String   @default("unreviewed")
-  lat          Float
-  lng          Float
-  description  String?
-  createdById  String?
-  confirmCount Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(uuid())
+  version       Int      @default(1)
+  legacySource  String?
+  legacyUuid    String?
+  legacyExId    Int?
+  name          String
+  type          String
+  kind          String   @default("port")
+  category      String   @default("marina")
+  categoryGroup String   @default("berthing")
+  subtype       String   @default("marina")
+  slug          String?
+  scope         String   @default("public")
+  status        String   @default("unreviewed")
+  lat           Float
+  lng           Float
+  region        String?
+  country       String?
+  address       String?
+  description   String?
+  rating        Float?
+  phone         String?
+  sourceUrl     String?
+  picture       String?
+  timezone      String?
+  searchText    String?
+  legacyStatus  Int?
+  bestMonths    Int[]    @default([])
+  sourcePayload Json?
+  infoPayload   Json?
+  extraPayload  Json?
+  syncedAt      DateTime?
+  isDeleted     Boolean  @default(false)
+  deletedAt     DateTime?
+  deletedBy     String?
+  createdById   String?
+  confirmCount  Int      @default(0)
+  commentsCount Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   confirms       PoiConfirm[]
   discoveryPoint DiscoveryPoint?
+  berthing       PoiBerthing?
+  notes          PoiNote[]
+  reviews        PoiReview[]
+  favorites      PoiFavorite[]
 
+  @@index([categoryGroup])
+  @@index([category])
+  @@index([subtype])
+  @@index([kind])
   @@index([type, status])
   @@index([lat, lng])
+  @@unique([legacySource, legacyUuid])
+}
+
+model PoiBerthing {
+  poiId             String   @id
+  berthingTypes     String[] @default([])
+  maxDraft          Float?
+  maxLength         Float?
+  maxBeam           Float?
+  multihullFriendly Boolean?
+  bookable          Boolean?
+  overnightAllowed  Boolean?
+  stayLimit         String?
+  feeInfo           String?
+  seabeds           String[] @default([])
+  protections       String[] @default([])
+  mooringTypes      String[] @default([])
+  water             Boolean?
+  power             Boolean?
+  fuel              Boolean?
+  toilets           Boolean?
+  showers           Boolean?
+  laundry           Boolean?
+  groceries         Boolean?
+  repair            Boolean?
+  wasteDisposal     Boolean?
+  dinghyLanding     Boolean?
+  updatedAt         DateTime @updatedAt
+
+  poi Poi @relation(fields: [poiId], references: [id], onDelete: Cascade)
 }
 
 model PoiConfirm {
@@ -366,6 +435,61 @@ model PoiConfirm {
 
   poi  Poi  @relation(fields: [poiId], references: [id])
   user User @relation(fields: [userId], references: [id])
+
+  @@unique([poiId, userId])
+  @@index([userId])
+}
+
+model PoiNote {
+  id            String    @id @default(uuid())
+  poiId         String
+  status        String    @default("published")
+  noteType      String    @default("info")
+  text          String
+  isPinned      Boolean   @default(false)
+  isConfirmed   Boolean   @default(false)
+  confirmedBy   String?
+  confirmedAt   DateTime?
+  createdBy     String?
+  createdByRole String    @default("user")
+  updatedBy      String?
+  deletedAt     DateTime?
+  deletedBy     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  poi  Poi   @relation(fields: [poiId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([poiId, status])
+  @@index([createdBy])
+  @@index([deletedAt])
+}
+
+model PoiReview {
+  id        String   @id @default(uuid())
+  poiId     String
+  userId    String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  poi  Poi  @relation(fields: [poiId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([poiId, userId])
+  @@index([userId])
+}
+
+model PoiFavorite {
+  id        String   @id @default(uuid())
+  poiId     String
+  userId    String
+  createdAt DateTime @default(now())
+
+  poi  Poi  @relation(fields: [poiId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([poiId, userId])
   @@index([userId])

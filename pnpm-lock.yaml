@@ -105,6 +105,9 @@ importers:
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
+      mysql2:
+        specifier: ^3.15.3
+        version: 3.15.3
       passport:
         specifier: ^0.7.0
         version: 0.7.0

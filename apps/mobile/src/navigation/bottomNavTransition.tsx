@@ -7,14 +7,17 @@ type BottomNavAnimation = 'default' | 'slide_from_left' | 'slide_from_right'
 
 type BottomNavTransitionContextValue = {
   animation: BottomNavAnimation
+  bottomNavHidden: boolean
   navigateBottomNav: (href: string, pathname: string) => void
   resetAnimation: () => void
+  setBottomNavHidden: (hidden: boolean) => void
 }
 
 const BottomNavTransitionContext = createContext<BottomNavTransitionContextValue | null>(null)
 
 export function BottomNavTransitionProvider({ children }: PropsWithChildren) {
   const [animation, setAnimation] = useState<BottomNavAnimation>('default')
+  const [bottomNavHidden, setBottomNavHidden] = useState(false)
 
   const resetAnimation = useCallback(() => {
     setAnimation('default')
@@ -38,8 +41,8 @@ export function BottomNavTransitionProvider({ children }: PropsWithChildren) {
   }, [])
 
   const value = useMemo(
-    () => ({ animation, navigateBottomNav, resetAnimation }),
-    [animation, navigateBottomNav, resetAnimation],
+    () => ({ animation, bottomNavHidden, navigateBottomNav, resetAnimation, setBottomNavHidden }),
+    [animation, bottomNavHidden, navigateBottomNav, resetAnimation],
   )
 
   return (

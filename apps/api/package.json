@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "selftest:v3-core": "tsc && node dist/tests/v3-core.self-test.js",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "sync:legacy-places": "tsc && node dist/scripts/sync-legacy-places.js"
   },
   "dependencies": {
     "@fastify/multipart": "^10.0.0",
@@ -30,6 +31,7 @@
     "dotenv": "^17.4.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "mysql2": "^3.15.3",
     "pg": "^8.20.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",

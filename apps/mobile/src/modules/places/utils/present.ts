@@ -96,6 +96,17 @@ const MOORING_LABELS: Record<string, string> = {
   quay: '岸壁靠泊',
 }
 
+const PROTECTION_LABELS: Record<string, string> = {
+  n: '北',
+  ne: '东北',
+  e: '东',
+  se: '东南',
+  s: '南',
+  sw: '西南',
+  w: '西',
+  nw: '西北',
+}
+
 function prettifyPoiTerm(value: string) {
   return value
     .replace(/[_-]+/g, ' ')
@@ -112,4 +123,9 @@ export function localizeSeabed(value: string, text: (source: string) => string =
 export function localizeMooring(value: string, text: (source: string) => string = (source) => source) {
   const key = value.trim().toLowerCase()
   return MOORING_LABELS[key] ? text(MOORING_LABELS[key]) : prettifyPoiTerm(value)
+}
+
+export function localizeProtection(value: string, text: (source: string) => string = (source) => source) {
+  const key = value.trim().toLowerCase()
+  return PROTECTION_LABELS[key] ? text(PROTECTION_LABELS[key]) : prettifyPoiTerm(value)
 }

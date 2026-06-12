@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'expo-router'
 import {
-  ActivityIndicator,
+  Animated,
+  PanResponder,
   Platform,
   ScrollView,
   StatusBar,
@@ -9,16 +9,20 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native'
-import MapView, { Callout, Marker, PROVIDER_GOOGLE, type MapType, type Region } from 'react-native-maps'
+import { LinearGradient } from 'expo-linear-gradient'
+import MapView, { Marker, PROVIDER_GOOGLE, type MapType, type Region } from 'react-native-maps'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import type { POI, PoiCategory, PoiRegionSummary } from '@lazynavy-v3/types'
-import { listPoisApi, listPoiSummariesApi } from '../api/client'
+import type { POI, PoiCategory, PoiNote, PoiRegionSummary, PoiReview } from '@lazynavy-v3/types'
+import { addPoiNoteApi, deletePoiNoteApi, getMyPoiReviewApi, getPoiApi, listPoiNotesApi, listPoiReviewsApi, listPoisApi, listPoiSummariesApi, upsertPoiReviewApi } from '../api/client'
 import { poiStore } from '../offline/poiStore'
-import { colorForCategory, iconForPoi, labelForCategory, POI_TYPES, shortInfoOf } from '../utils/present'
+import { colorForCategory, coordinateLabel, iconForPoi, labelForCategory, localizeProtection, POI_TYPES, shortInfoOf } from '../utils/present'
+import { useAuth } from '../../identity/public'
 import { useTheme } from '../../../theme'
 import { useI18n } from '../../../i18n'
+import { useBottomNavTransition } from '../../../navigation/bottomNavTransition'
 
 const DEFAULT_REGION: Region = {
   latitude: 38.463,
@@ -41,6 +45,17 @@ type FetchSnapshot = {
   filter: PoiCategory | 'all'
   query: string
 }
+
+const PROTECTION_DIRECTIONS = [
+  { key: 'n', short: 'N', label: '北', x: 85, y: 8 },
+  { key: 'ne', short: 'NE', label: '东北', x: 145, y: 28 },
+  { key: 'e', short: 'E', label: '东', x: 164, y: 88 },
+  { key: 'se', short: 'SE', label: '东南', x: 145, y: 148 },
+  { key: 's', short: 'S', label: '南', x: 85, y: 168 },
+  { key: 'sw', short: 'SW', label: '西南', x: 25, y: 148 },
+  { key: 'w', short: 'W', label: '西', x: 6, y: 88 },
+  { key: 'nw', short: 'NW', label: '西北', x: 25, y: 28 },
+] as const
 
 function bboxForRegion(region: Region) {
   return {
@@ -170,15 +185,26 @@ function hasMovedEnough(previous: Region, next: Region) {
   )
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
+}
+
 export default function MapScreen() {
   const t = useTheme()
   const { text } = useI18n()
+  const { token, user } = useAuth()
+  const { setBottomNavHidden } = useBottomNavTransition()
   const insets = useSafeAreaInsets()
-  const router = useRouter()
+  const { height: windowHeight } = useWindowDimensions()
   const mapRef = useRef<MapView | null>(null)
   const requestSeqRef = useRef(0)
   const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastFetchRef = useRef<FetchSnapshot | null>(null)
+  const detailLoadRef = useRef<string | null>(null)
+  const suppressNextMapPressRef = useRef(false)
+  const sheetDismissingRef = useRef(false)
+  const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current
+  const sheetOffsetRef = useRef(windowHeight)
   const [region, setRegion] = useState(DEFAULT_REGION)
   const [mapType, setMapType] = useState<MapType>('standard')
   const [filter, setFilter] = useState<PoiCategory | 'all'>('all')
@@ -187,15 +213,32 @@ export default function MapScreen() {
   const [summaries, setSummaries] = useState<PoiRegionSummary[]>([])
   const [pois, setPois] = useState<POI[]>([])
   const [selectedPoi, setSelectedPoi] = useState<POI | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [sheetDetailPoi, setSheetDetailPoi] = useState<POI | null>(null)
+  const [sheetDetailLoading, setSheetDetailLoading] = useState(false)
+  const [sheetDetailError, setSheetDetailError] = useState<string | null>(null)
+  const [sheetExpanded, setSheetExpanded] = useState(false)
+  const [detailTab, setDetailTab] = useState<'详情' | '评价' | '照片'>('详情')
+  const [poiNotes, setPoiNotes] = useState<PoiNote[]>([])
+  const [noteText, setNoteText] = useState('')
+  const [noteType, setNoteType] = useState<'info' | 'warning'>('info')
+  const [addingNote, setAddingNote] = useState(false)
+  const [submittingNote, setSubmittingNote] = useState(false)
+  const [poiReviews, setPoiReviews] = useState<PoiReview[]>([])
+  const [myRating, setMyRating] = useState(0)
+  const [myComment, setMyComment] = useState('')
+  const [savingReview, setSavingReview] = useState(false)
+  const [, setLoading] = useState(true)
+  const [, setRefreshing] = useState(false)
+  const [, setError] = useState<string | null>(null)
   const [dataMode, setDataMode] = useState<DataMode>('none')
-  const [offlineMode, setOfflineMode] = useState(false)
+  const [, setOfflineMode] = useState(false)
 
   const zoom = zoomFromRegion(region)
   const viewportMode = modeForZoom(zoom)
-  const displayedCount = dataMode === 'detail' ? pois.length : summaries.length
+  const sheetHeight = windowHeight
+  const collapsedSheetHeight = Math.min(Math.max(windowHeight / 3, 260), sheetHeight - 84)
+  const collapsedSheetOffset = sheetHeight - collapsedSheetHeight
+  const hiddenSheetOffset = sheetHeight + insets.bottom + 24
 
   const s = useMemo(() => StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg, overflow: 'hidden' },
@@ -306,60 +349,683 @@ export default function MapScreen() {
       elevation: 4,
     },
     summaryText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-    callout: { width: 220, gap: 7 },
-    calloutType: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-    calloutName: { color: '#0f172a', fontSize: 16, fontWeight: '800', lineHeight: 20 },
-    calloutMeta: { color: '#475569', fontSize: 12, lineHeight: 17 },
-    calloutBtn: {
-      marginTop: 4,
-      height: 34,
-      borderRadius: 10,
-      backgroundColor: '#0ea5e9',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    calloutBtnText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-    bottomPanel: {
+    poiSheet: {
       position: 'absolute',
-      left: 14,
-      right: 14,
-      bottom: 92,
-      borderRadius: 22,
-      backgroundColor: 'rgba(7,29,54,0.88)',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: sheetHeight,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      backgroundColor: t.surface,
       borderWidth: 0.5,
-      borderColor: 'rgba(245,240,232,0.12)',
-      padding: 14,
-      gap: 8,
+      borderColor: t.border,
+      borderBottomWidth: 0,
+      shadowColor: '#0f172a',
+      shadowOffset: { width: 0, height: -10 },
+      shadowOpacity: 0.18,
+      shadowRadius: 24,
+      elevation: 12,
+      overflow: 'hidden',
     },
-    panelTitle: { color: t.text, fontSize: 14, fontWeight: '800' },
-    panelText: { color: t.textDim, fontSize: 12.5, lineHeight: 18 },
-    panelAction: {
-      alignSelf: 'flex-start',
-      height: 34,
-      borderRadius: 17,
+    poiSheetFull: {
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      borderWidth: 0,
+      shadowOpacity: 0,
+      backgroundColor: '#f6f4ef',
+    },
+    sheetNav: {
+      paddingTop: insets.top + 8,
       paddingHorizontal: 14,
-      backgroundColor: t.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    panelActionText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-    status: {
-      position: 'absolute',
-      left: 14,
-      bottom: 92,
-      maxWidth: 240,
-      borderRadius: 18,
-      backgroundColor: 'rgba(7,29,54,0.88)',
-      borderWidth: 0.5,
-      borderColor: 'rgba(245,240,232,0.12)',
-      paddingHorizontal: 12,
-      paddingVertical: 10,
+      paddingBottom: 8,
+      minHeight: insets.top + 58,
       flexDirection: 'row',
       alignItems: 'center',
+      gap: 12,
+      borderBottomWidth: 0.5,
+      borderBottomColor: t.border,
+      backgroundColor: t.surface,
+    },
+    sheetNavButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.surfaceAlt,
+      borderWidth: 0.5,
+      borderColor: t.border,
+    },
+    sheetNavButtonText: { color: t.text, fontSize: 22, fontWeight: '800', lineHeight: 24 },
+    sheetNavCenter: { flex: 1 },
+    sheetNavTitle: { color: t.text, fontSize: 16, fontWeight: '900' },
+    sheetNavMeta: { color: t.textDim, fontSize: 11.5, marginTop: 2 },
+    sheetHandleZone: {
+      height: 30,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sheetHandle: {
+      width: 42,
+      height: 4,
+      borderRadius: 999,
+      backgroundColor: t.textSoft,
+      opacity: 0.65,
+    },
+    sheetContent: {
+      paddingHorizontal: 18,
+      paddingBottom: insets.bottom + 32,
+      gap: 14,
+    },
+    sheetContentFull: {
+      paddingHorizontal: 0,
+      paddingTop: 0,
+      paddingBottom: insets.bottom + 44,
+      gap: 0,
+      backgroundColor: '#f6f4ef',
+    },
+    sheetHeader: {
+      flexDirection: 'row',
+      gap: 12,
+      alignItems: 'flex-start',
+    },
+    sheetIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      borderWidth: 2,
+      borderColor: '#fff',
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#0f172a',
+      shadowOffset: { width: 0, height: 5 },
+      shadowOpacity: 0.16,
+      shadowRadius: 10,
+      elevation: 4,
+    },
+    sheetIconText: { color: '#fff', fontSize: 16, fontWeight: '900' },
+    sheetHeaderText: {
+      flex: 1,
       gap: 8,
     },
-    statusText: { color: t.text, fontSize: 12, fontWeight: '700', flexShrink: 1 },
-  }), [insets.top, t])
+    sheetKicker: { fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+    panelTitle: { color: t.text, fontSize: 20, fontWeight: '900', lineHeight: 25 },
+    panelText: { color: t.textDim, fontSize: 13, lineHeight: 19 },
+    sheetClose: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: t.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sheetCloseText: { color: t.textDim, fontSize: 18, fontWeight: '800' },
+    sheetStats: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    sheetStat: {
+      flex: 1,
+      minHeight: 70,
+      borderRadius: 14,
+      backgroundColor: t.surfaceAlt,
+      borderWidth: 0.5,
+      borderColor: t.border,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      gap: 5,
+    },
+    sheetStatLabel: { color: t.textSoft, fontSize: 10, fontWeight: '900' },
+    sheetStatValue: { color: t.text, fontSize: 14, fontWeight: '800' },
+    detailHero: {
+      minHeight: 312,
+      overflow: 'hidden',
+      justifyContent: 'flex-end',
+      paddingHorizontal: 18,
+      paddingBottom: 18,
+      backgroundColor: '#102a4f',
+    },
+    detailPhotoBase: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    detailPhotoStripeLayer: {
+      ...StyleSheet.absoluteFillObject,
+      opacity: 0.28,
+    },
+    detailPhotoStripe: {
+      position: 'absolute',
+      width: 1,
+      height: 520,
+      backgroundColor: 'rgba(255,255,255,0.10)',
+      transform: [{ rotate: '45deg' }],
+    },
+    detailPhotoHorizon: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: '58%',
+      height: 1,
+      backgroundColor: 'rgba(255,255,255,0.16)',
+    },
+    detailPhotoLabel: {
+      position: 'absolute',
+      left: 12,
+      bottom: 10,
+      color: 'rgba(255,255,255,0.65)',
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 1.2,
+    },
+    detailHeroFadeTop: {
+      ...StyleSheet.absoluteFillObject,
+      height: 128,
+    },
+    detailHeroFadeBottom: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: 144,
+    },
+    heroChrome: {
+      position: 'absolute',
+      top: insets.top + 10,
+      left: 12,
+      right: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    heroChromeBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    heroChromeBtnText: { color: '#fff', fontSize: 24, fontWeight: '800', lineHeight: 26 },
+    heroStatusPill: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 4,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    heroStatusText: {
+      color: '#fff',
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 1.1,
+    },
+    heroRightActions: { flexDirection: 'row', gap: 8 },
+    detailHeroTop: {
+      gap: 6,
+    },
+    detailHeroPillRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 2,
+    },
+    detailHeroTypePill: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 4,
+    },
+    detailHeroTypeText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+    detailHeroStatusPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      borderRadius: 4,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+    },
+    detailHeroStatusDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#4ade80' },
+    detailHeroStatusText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+    detailHeroTitle: { color: '#fff', fontSize: 25, lineHeight: 31, fontWeight: '900' },
+    detailHeroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' },
+    detailHeroMeta: { color: 'rgba(255,255,255,0.82)', fontSize: 12.5, lineHeight: 18, fontWeight: '700' },
+    detailHeroMetaDot: { color: 'rgba(255,255,255,0.52)', fontSize: 12 },
+    detailBody: {
+      paddingHorizontal: 14,
+      paddingTop: 12,
+      gap: 12,
+    },
+    quickActionRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    quickActionPrimary: {
+      flex: 1,
+      height: 42,
+      borderRadius: 12,
+      backgroundColor: '#0284c7',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 6,
+    },
+    quickActionPrimaryText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+    quickActionIconBtn: {
+      width: 42,
+      height: 42,
+      borderRadius: 12,
+      backgroundColor: '#fff',
+      borderWidth: 0.5,
+      borderColor: 'rgba(13,52,96,0.10)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    quickActionIconText: { color: '#0d3460', fontSize: 18, fontWeight: '900' },
+    detailTabsRow: {
+      flexDirection: 'row',
+      gap: 18,
+      paddingHorizontal: 2,
+      borderBottomWidth: 0.5,
+      borderBottomColor: 'rgba(13,52,96,0.10)',
+    },
+    detailTabBtn: {
+      paddingTop: 8,
+      paddingBottom: 9,
+      position: 'relative',
+    },
+    detailTabText: { fontSize: 14, fontWeight: '700' },
+    detailTabUnderline: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: -1,
+      height: 2,
+      backgroundColor: '#0284c7',
+    },
+    noticeStrip: {
+      borderRadius: 12,
+      backgroundColor: 'rgba(251,146,60,0.10)',
+      borderWidth: 0.5,
+      borderColor: 'rgba(251,146,60,0.30)',
+      padding: 12,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+    },
+    noticeIcon: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: '#fb923c',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 1,
+    },
+    noticeIconText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+    noticeText: { flex: 1, color: '#b45309', fontSize: 12, lineHeight: 18, fontWeight: '700' },
+    cardPad: {
+      borderRadius: 16,
+      backgroundColor: '#fff',
+      borderWidth: 0.5,
+      borderColor: 'rgba(13,52,96,0.10)',
+      padding: 16,
+    },
+    sectionKicker: {
+      color: 'rgba(13,52,96,0.62)',
+      fontSize: 10,
+      fontWeight: '900',
+      letterSpacing: 1.4,
+      marginBottom: 12,
+    },
+    vitalsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      rowGap: 14,
+      columnGap: 10,
+    },
+    vitalCell: { width: '47%' },
+    vitalLabel: { color: 'rgba(13,52,96,0.32)', fontSize: 10, fontWeight: '800', marginBottom: 3 },
+    vitalValue: { color: '#0d3460', fontSize: 12.5, lineHeight: 17, fontWeight: '700' },
+    protectionCompassWrap: {
+      marginTop: 16,
+      borderRadius: 14,
+      backgroundColor: '#f5f8f5',
+      borderWidth: 0.5,
+      borderColor: 'rgba(5,150,105,0.16)',
+      padding: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+    },
+    protectionCompass: {
+      width: 198,
+      height: 198,
+      borderRadius: 99,
+      backgroundColor: '#e8f3ed',
+      borderWidth: 1,
+      borderColor: 'rgba(5,150,105,0.18)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    protectionCompassRing: {
+      position: 'absolute',
+      width: 116,
+      height: 116,
+      borderRadius: 58,
+      borderWidth: 1,
+      borderColor: 'rgba(13,52,96,0.10)',
+    },
+    protectionCompassCrossV: {
+      position: 'absolute',
+      width: 1,
+      height: 154,
+      backgroundColor: 'rgba(13,52,96,0.08)',
+    },
+    protectionCompassCrossH: {
+      position: 'absolute',
+      height: 1,
+      width: 154,
+      backgroundColor: 'rgba(13,52,96,0.08)',
+    },
+    protectionCenter: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: '#fff',
+      borderWidth: 1,
+      borderColor: 'rgba(5,150,105,0.22)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#0d3460',
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+    },
+    protectionCenterIcon: { color: '#047857', fontSize: 24, fontWeight: '900' },
+    protectionDirection: {
+      position: 'absolute',
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+    },
+    protectionDirectionText: { fontSize: 8.5, fontWeight: '900' },
+    protectionLegend: { flex: 1, gap: 8 },
+    protectionLegendTitle: { color: '#0d3460', fontSize: 13, fontWeight: '900', lineHeight: 18 },
+    protectionLegendText: { color: 'rgba(13,52,96,0.58)', fontSize: 12, lineHeight: 18, fontWeight: '700' },
+    protectionLegendPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
+    protectionPill: {
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      borderRadius: 999,
+      backgroundColor: 'rgba(5,150,105,0.10)',
+    },
+    protectionPillText: { color: '#047857', fontSize: 11, fontWeight: '800' },
+    addressDivider: {
+      height: 0.5,
+      backgroundColor: 'rgba(13,52,96,0.10)',
+      marginVertical: 14,
+      marginHorizontal: -16,
+    },
+    amenitiesGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    amenityTile: {
+      width: '31%',
+      minHeight: 58,
+      borderRadius: 10,
+      backgroundColor: '#f0ece3',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 6,
+      paddingVertical: 9,
+    },
+    amenityValue: { fontSize: 15, fontWeight: '900', marginBottom: 4 },
+    amenityLabel: { color: 'rgba(13,52,96,0.62)', fontSize: 11, fontWeight: '700', textAlign: 'center' },
+    reviewItem: {
+      paddingVertical: 12,
+      borderBottomWidth: 0.5,
+      borderBottomColor: 'rgba(13,52,96,0.10)',
+    },
+    reviewTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 7 },
+    reviewAvatar: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: '#17446f',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    reviewAvatarText: { color: '#fff', fontSize: 12, fontWeight: '900' },
+    reviewName: { color: '#0d3460', fontSize: 13, fontWeight: '800' },
+    reviewStars: { color: '#fbbf24', fontSize: 11, marginTop: 1 },
+    reviewText: { color: 'rgba(13,52,96,0.64)', fontSize: 13, lineHeight: 19 },
+    emptyText: { color: 'rgba(13,52,96,0.48)', fontSize: 13, lineHeight: 19, fontWeight: '700' },
+    noteHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+    inlineActionText: { color: '#0284c7', fontSize: 12.5, fontWeight: '900' },
+    noteComposer: {
+      borderRadius: 14,
+      backgroundColor: '#f6f4ef',
+      borderWidth: 0.5,
+      borderColor: 'rgba(13,52,96,0.10)',
+      padding: 12,
+      gap: 10,
+      marginBottom: 12,
+    },
+    noteTypeRow: { flexDirection: 'row', gap: 8 },
+    noteTypeChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 999,
+      backgroundColor: '#fff',
+      borderWidth: 0.5,
+      borderColor: 'rgba(13,52,96,0.12)',
+    },
+    noteTypeChipActive: { backgroundColor: '#0284c7', borderColor: '#0284c7' },
+    noteTypeChipWarn: { backgroundColor: '#f97316', borderColor: '#f97316' },
+    noteTypeChipText: { color: 'rgba(13,52,96,0.62)', fontSize: 12, fontWeight: '800' },
+    noteTypeChipTextActive: { color: '#fff' },
+    noteInput: {
+      minHeight: 72,
+      borderRadius: 12,
+      backgroundColor: '#fff',
+      borderWidth: 0.5,
+      borderColor: 'rgba(13,52,96,0.10)',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      color: '#0d3460',
+      fontSize: 13,
+      lineHeight: 18,
+      textAlignVertical: 'top',
+    },
+    submitBtn: {
+      alignSelf: 'flex-start',
+      borderRadius: 999,
+      backgroundColor: '#0284c7',
+      paddingHorizontal: 16,
+      paddingVertical: 9,
+    },
+    submitBtnDisabled: { opacity: 0.48 },
+    submitBtnText: { color: '#fff', fontSize: 12.5, fontWeight: '900' },
+    noteItem: {
+      paddingVertical: 11,
+      borderTopWidth: 0.5,
+      borderTopColor: 'rgba(13,52,96,0.10)',
+      gap: 6,
+    },
+    noteItemWarn: {
+      marginHorizontal: -6,
+      paddingHorizontal: 10,
+      borderRadius: 12,
+      backgroundColor: 'rgba(249,115,22,0.09)',
+      borderTopWidth: 0,
+      marginTop: 8,
+    },
+    noteItemTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+    noteBadge: { color: 'rgba(13,52,96,0.46)', fontSize: 11, fontWeight: '900' },
+    noteBadgeWarn: { color: '#c2410c' },
+    noteDeleteText: { color: 'rgba(13,52,96,0.46)', fontSize: 12, fontWeight: '800' },
+    noteBody: { color: '#0d3460', fontSize: 13, lineHeight: 19, fontWeight: '700' },
+    ratingSummary: {
+      borderRadius: 14,
+      backgroundColor: '#f6f4ef',
+      padding: 12,
+      marginBottom: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    ratingBig: { color: '#0d3460', fontSize: 25, lineHeight: 29, fontWeight: '900' },
+    ratingCaption: { color: 'rgba(13,52,96,0.48)', fontSize: 12, fontWeight: '800' },
+    reviewComposer: {
+      borderRadius: 14,
+      backgroundColor: '#fffaf0',
+      borderWidth: 0.5,
+      borderColor: 'rgba(251,191,36,0.26)',
+      padding: 12,
+      gap: 10,
+      marginBottom: 12,
+    },
+    starRow: { flexDirection: 'row', gap: 4 },
+    starBtn: { paddingRight: 4, paddingVertical: 2 },
+    starText: { color: 'rgba(13,52,96,0.18)', fontSize: 27, lineHeight: 30, fontWeight: '900' },
+    starTextOn: { color: '#f59e0b' },
+    photoGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 4,
+    },
+    photoTile: {
+      width: '32%',
+      aspectRatio: 1,
+      borderRadius: 8,
+      overflow: 'hidden',
+      backgroundColor: '#17446f',
+    },
+    photoTileStripeLayer: { ...StyleSheet.absoluteFillObject, opacity: 0.22 },
+    photoTileStripe: {
+      position: 'absolute',
+      width: 1,
+      height: 170,
+      backgroundColor: 'rgba(255,255,255,0.14)',
+      transform: [{ rotate: '45deg' }],
+    },
+    photoTileHorizon: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: '58%',
+      height: 1,
+      backgroundColor: 'rgba(255,255,255,0.16)',
+    },
+    detailMetricRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    detailMetric: {
+      flex: 1,
+      minHeight: 82,
+      borderRadius: 16,
+      paddingVertical: 12,
+      paddingHorizontal: 8,
+      backgroundColor: '#fff',
+      borderWidth: 0.5,
+      borderColor: 'rgba(13,52,96,0.10)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+    },
+    detailMetricIcon: { color: '#0284c7', fontSize: 17, fontWeight: '900' },
+    detailMetricLabel: { color: 'rgba(13,52,96,0.38)', fontSize: 9.5, fontWeight: '900', letterSpacing: 1 },
+    detailMetricValue: { color: '#0d3460', fontSize: 15, fontWeight: '900', lineHeight: 18, textAlign: 'center' },
+    sheetBlock: {
+      borderRadius: 16,
+      backgroundColor: '#fff',
+      borderWidth: 0.5,
+      borderColor: 'rgba(13,52,96,0.10)',
+      padding: 0,
+      overflow: 'hidden',
+    },
+    sheetBlockPad: { padding: 14, gap: 10 },
+    sheetBlockHeader: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    sheetBlockTitle: { color: '#0d3460', fontSize: 15, fontWeight: '900' },
+    sheetBlockKicker: { color: 'rgba(13,52,96,0.42)', fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
+    sheetBlockText: { color: 'rgba(13,52,96,0.64)', fontSize: 13, lineHeight: 20 },
+    sheetLoadingText: { color: '#0284c7', fontSize: 13, fontWeight: '800' },
+    detailDivider: {
+      height: 0.5,
+      backgroundColor: 'rgba(13,52,96,0.10)',
+      marginLeft: 70,
+    },
+    detailGrid: { gap: 10 },
+    detailRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 14,
+      paddingVertical: 4,
+    },
+    detailLabel: { color: t.textSoft, fontSize: 12, fontWeight: '800', flex: 1 },
+    detailValue: { color: t.text, fontSize: 13, lineHeight: 18, textAlign: 'right', flex: 1.4 },
+    infoCluster: {
+      gap: 0,
+    },
+    infoTile: {
+      flexDirection: 'row',
+      gap: 12,
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 13,
+      backgroundColor: '#fff',
+    },
+    infoTileIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#f0ece3',
+      color: '#0284c7',
+      fontSize: 17,
+      fontWeight: '900',
+      overflow: 'hidden',
+    },
+    infoTileBody: { flex: 1, gap: 3 },
+    infoTileLabel: { color: 'rgba(13,52,96,0.42)', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+    infoTileValue: { color: '#0d3460', fontSize: 13.5, lineHeight: 19, fontWeight: '700' },
+    noteCard: {
+      borderRadius: 16,
+      backgroundColor: '#fff',
+      borderWidth: 0.5,
+      borderColor: 'rgba(13,52,96,0.10)',
+      padding: 16,
+      gap: 8,
+    },
+    zoomBadge: {
+      position: 'absolute',
+      left: 14,
+      bottom: 92,
+      borderRadius: 14,
+      backgroundColor: 'rgba(255,255,255,0.9)',
+      borderWidth: 0.5,
+      borderColor: 'rgba(148,163,184,0.28)',
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    zoomBadgeText: { color: '#334155', fontSize: 11, fontWeight: '800' },
+  }), [insets.bottom, insets.top, sheetHeight, t])
 
   useEffect(() => {
     scheduleMapDataLoad(region, true)
@@ -367,6 +1033,58 @@ export default function MapScreen() {
       if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current)
     }
   }, [filter, query])
+
+  useEffect(() => {
+    if (selectedPoi) {
+      animateSheetTo(collapsedSheetOffset)
+    } else {
+      sheetTranslateY.setValue(hiddenSheetOffset)
+      sheetOffsetRef.current = hiddenSheetOffset
+    }
+  }, [collapsedSheetOffset, hiddenSheetOffset, selectedPoi?.id])
+
+  useEffect(() => {
+    setBottomNavHidden(sheetExpanded)
+    return () => setBottomNavHidden(false)
+  }, [setBottomNavHidden, sheetExpanded])
+
+  useEffect(() => {
+    if (!selectedPoi || !sheetExpanded) return
+    void refreshSheetNotes(selectedPoi.id)
+    void refreshSheetReviews(selectedPoi.id)
+  }, [selectedPoi?.id, sheetExpanded, token])
+
+  const sheetPanResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) => (
+      Math.abs(gesture.dy) > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx)
+    ),
+    onPanResponderGrant: () => {
+      sheetTranslateY.stopAnimation((value) => {
+        sheetOffsetRef.current = value
+      })
+    },
+    onPanResponderMove: (_, gesture) => {
+      const next = clamp(sheetOffsetRef.current + gesture.dy, 0, hiddenSheetOffset)
+      sheetTranslateY.setValue(next)
+    },
+    onPanResponderRelease: (_, gesture) => {
+      const next = sheetOffsetRef.current + gesture.dy
+      if (gesture.dy > 72 || gesture.vy > 0.75) {
+        dismissSheet()
+        return
+      }
+      if (sheetExpanded) {
+        animateSheetTo(0)
+        return
+      }
+      if (gesture.dy < -48 || gesture.vy < -0.55 || next < collapsedSheetOffset / 2) {
+        if (selectedPoi) expandSheet(selectedPoi)
+        return
+      }
+      animateSheetTo(collapsedSheetOffset)
+    },
+    onPanResponderTerminate: () => animateSheetTo(sheetExpanded ? 0 : collapsedSheetOffset),
+  }), [collapsedSheetOffset, hiddenSheetOffset, selectedPoi, sheetExpanded, sheetTranslateY])
 
   function shouldFetch(nextRegion: Region, force = false) {
     if (force) return true
@@ -428,6 +1146,7 @@ export default function MapScreen() {
         lng: targetRegion.longitude,
         zoom: targetZoom,
         limit: 220,
+        ...(hasQuery ? {} : bufferedBBoxForRegion(targetRegion, targetMode === 'summary' ? 0.75 : 0.5)),
       }
       if (targetMode === 'detail') {
         const next = await listPoisApi(filters)
@@ -594,22 +1313,178 @@ export default function MapScreen() {
     mapRef.current?.animateToRegion(summaryRegion(summary, region), 360)
   }
 
-  function openPoi(poi: POI) {
-    router.push(`/poi/${poi.id}`)
+  function animateSheetTo(toValue: number, onDone?: () => void) {
+    sheetOffsetRef.current = toValue
+    Animated.timing(sheetTranslateY, {
+      toValue,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) onDone?.()
+    })
   }
 
-  function renderStatusText() {
-    if (loading) return text('正在加载地标...')
-    if (error) return error
-    if (offlineMode) {
-      if (dataMode === 'summary') return `${text('本地缓存')} · ${displayedCount} ${text('个区域')} · ${text('放大查看地标')}`
-      if (dataMode === 'detail') return `${text('本地缓存')} · ${displayedCount} ${text('个地标')}`
-      return `${text('本地缓存')} · ${text('放大查看地标')}`
+  function dismissSheet() {
+    if (sheetDismissingRef.current) return
+    sheetDismissingRef.current = true
+    animateSheetTo(hiddenSheetOffset, () => {
+      setSelectedPoi(null)
+      setSheetDetailPoi(null)
+      setSheetDetailError(null)
+      setSheetDetailLoading(false)
+      setSheetExpanded(false)
+      setPoiNotes([])
+      setPoiReviews([])
+      setMyRating(0)
+      setMyComment('')
+      setNoteText('')
+      setNoteType('info')
+      setAddingNote(false)
+      sheetDismissingRef.current = false
+    })
+  }
+
+  function expandSheet(poi: POI) {
+    setSheetExpanded(true)
+    setDetailTab('详情')
+    animateSheetTo(0)
+    void loadPoiDetailIntoSheet(poi)
+  }
+
+  function collapseSheet() {
+    setSheetExpanded(false)
+    animateSheetTo(collapsedSheetOffset)
+  }
+
+  async function loadPoiDetailIntoSheet(poi: POI) {
+    if (sheetDetailPoi?.id === poi.id) return
+    if (detailLoadRef.current === poi.id) return
+    detailLoadRef.current = poi.id
+    setSheetDetailLoading(true)
+    setSheetDetailError(null)
+    try {
+      const detail = await getPoiApi(poi.id)
+      setSheetDetailPoi(detail)
+      void poiStore.upsertDetail(detail).catch(() => undefined)
+    } catch (err: any) {
+      setSheetDetailError(err?.message ?? text('详情加载失败'))
+    } finally {
+      if (detailLoadRef.current === poi.id) detailLoadRef.current = null
+      setSheetDetailLoading(false)
     }
-    if (refreshing) return text('正在刷新地标...')
-    if (dataMode === 'summary') return `${displayedCount} ${text('个区域')} · ${text('放大查看地标')}`
-    if (dataMode === 'detail') return `${displayedCount} ${text('个地标')}`
-    return text('放大查看地标')
+  }
+
+  async function refreshSheetNotes(poiId: string) {
+    try {
+      setPoiNotes(await listPoiNotesApi(poiId))
+    } catch {
+      // Keep the current snapshot when offline or the notes endpoint is unavailable.
+    }
+  }
+
+  async function refreshSheetReviews(poiId: string) {
+    try {
+      setPoiReviews(await listPoiReviewsApi(poiId))
+    } catch {
+      // Keep the current snapshot when offline or the reviews endpoint is unavailable.
+    }
+    if (token) {
+      try {
+        const mine = await getMyPoiReviewApi(poiId, token)
+        setMyRating(mine?.rating ?? 0)
+        setMyComment(mine?.comment ?? '')
+      } catch {
+        // Anonymous or expired sessions simply won't prefill the composer.
+      }
+    } else {
+      setMyRating(0)
+      setMyComment('')
+    }
+  }
+
+  async function submitSheetNote(poiId: string) {
+    if (!token) {
+      setSheetDetailError(text('登录后才能添加备注'))
+      return
+    }
+    if (submittingNote || !noteText.trim()) return
+    setSubmittingNote(true)
+    try {
+      await addPoiNoteApi(poiId, { text: noteText.trim(), noteType }, token)
+      setNoteText('')
+      setNoteType('info')
+      setAddingNote(false)
+      await refreshSheetNotes(poiId)
+    } catch (err: any) {
+      setSheetDetailError(err?.message ?? text('添加备注失败'))
+    } finally {
+      setSubmittingNote(false)
+    }
+  }
+
+  async function removeSheetNote(poiId: string, noteId: string) {
+    if (!token) return
+    try {
+      await deletePoiNoteApi(poiId, noteId, token)
+      setPoiNotes((current) => current.filter((note) => note.id !== noteId))
+    } catch (err: any) {
+      setSheetDetailError(err?.message ?? text('删除备注失败'))
+    }
+  }
+
+  async function submitSheetReview(poiId: string) {
+    if (!token) {
+      setSheetDetailError(text('登录后才能评价地标'))
+      return
+    }
+    if (savingReview || myRating < 1) return
+    setSavingReview(true)
+    try {
+      await upsertPoiReviewApi(poiId, { rating: myRating, comment: myComment.trim() || undefined }, token)
+      const fresh = await getPoiApi(poiId)
+      setSheetDetailPoi(fresh)
+      setSelectedPoi((current) => current?.id === poiId ? fresh : current)
+      void poiStore.upsertDetail(fresh).catch(() => undefined)
+      await refreshSheetReviews(poiId)
+    } catch (err: any) {
+      setSheetDetailError(err?.message ?? text('提交评价失败'))
+    } finally {
+      setSavingReview(false)
+    }
+  }
+
+  function selectPoi(poi: POI) {
+    sheetDismissingRef.current = false
+    suppressNextMapPressRef.current = true
+    setSelectedPoi(poi)
+    setDetailTab('详情')
+    setSheetDetailPoi(null)
+    setSheetDetailError(null)
+    setSheetDetailLoading(false)
+    setPoiNotes(poi.notes ?? [])
+    setPoiReviews([])
+    setMyRating(0)
+    setMyComment('')
+    setNoteText('')
+    setNoteType('info')
+    setAddingNote(false)
+    setSheetExpanded(false)
+    setTimeout(() => {
+      suppressNextMapPressRef.current = false
+    }, 120)
+  }
+
+  function clearSelectedPoiFromMapPress() {
+    if (suppressNextMapPressRef.current) {
+      suppressNextMapPressRef.current = false
+      return
+    }
+    if (selectedPoi) dismissSheet()
+  }
+
+  function handleSheetScroll(event: any) {
+    if (!sheetExpanded || sheetDismissingRef.current) return
+    if (event.nativeEvent.contentOffset.y < -72) dismissSheet()
   }
 
   return (
@@ -633,7 +1508,7 @@ export default function MapScreen() {
           setRegion(nextRegion)
           scheduleMapDataLoad(nextRegion)
         }}
-        onPress={() => setSelectedPoi(null)}
+        onPress={clearSelectedPoiFromMapPress}
       >
         {dataMode === 'summary' ? summaries.map((summary) => (
           <Marker
@@ -661,24 +1536,13 @@ export default function MapScreen() {
                 longitude: poi.location.lng,
               }}
               tracksViewChanges={false}
-              onPress={() => setSelectedPoi(poi)}
-              onCalloutPress={() => openPoi(poi)}
+              onPress={() => selectPoi(poi)}
             >
-              <View style={s.markerWrap}>
+              <TouchableOpacity style={s.markerWrap} activeOpacity={0.82} onPress={() => selectPoi(poi)}>
                 <View style={[s.markerBody, { backgroundColor: color }]}>
                   <Text style={s.markerText}>{iconForPoi(poi)}</Text>
                 </View>
-              </View>
-              <Callout tooltip={false}>
-                <View style={s.callout}>
-                  <Text style={[s.calloutType, { color }]}>{labelForCategory(poi.category, text).toUpperCase()}</Text>
-                  <Text style={s.calloutName}>{poi.name}</Text>
-                  <Text style={s.calloutMeta}>{shortInfoOf(poi, text)}</Text>
-                  <TouchableOpacity style={s.calloutBtn} onPress={() => openPoi(poi)}>
-                    <Text style={s.calloutBtnText}>{text('查看详情')}</Text>
-                  </TouchableOpacity>
-                </View>
-              </Callout>
+              </TouchableOpacity>
             </Marker>
           )
         }) : null}
@@ -727,20 +1591,482 @@ export default function MapScreen() {
         </TouchableOpacity>
       </View>
 
-      {selectedPoi ? (
-        <View style={s.bottomPanel}>
-          <Text style={s.panelTitle}>{selectedPoi.name}</Text>
-          <Text style={s.panelText}>{labelForCategory(selectedPoi.category, text)} · {shortInfoOf(selectedPoi, text)}</Text>
-          <TouchableOpacity style={s.panelAction} onPress={() => openPoi(selectedPoi)}>
-            <Text style={s.panelActionText}>{text('打开详情')}</Text>
-          </TouchableOpacity>
+      {!selectedPoi ? (
+        <View style={s.zoomBadge} pointerEvents="none">
+          <Text style={s.zoomBadgeText}>zoom {zoom} · {viewportMode}</Text>
         </View>
-      ) : (
-        <View style={s.status}>
-          {loading || refreshing ? <ActivityIndicator size="small" color={t.text} /> : null}
-          <Text style={s.statusText}>{renderStatusText()}</Text>
-        </View>
-      )}
+      ) : null}
+
+      {selectedPoi ? (() => {
+        const color = colorForCategory(selectedPoi.category)
+        const categoryLabel = labelForCategory(selectedPoi.category, text)
+        const detailPoi = sheetDetailPoi?.id === selectedPoi.id ? sheetDetailPoi : selectedPoi
+        const isAnchorage = detailPoi.category === 'anchorage'
+        const isBuoy = detailPoi.category === 'buoy_mooring'
+        const isMarina = detailPoi.category === 'marina'
+        const isQuay = detailPoi.category === 'public_quay'
+        const isDryDock = detailPoi.category === 'dry_dock'
+        const isHazard = detailPoi.category === 'hazard'
+        const seabeds = Array.isArray(detailPoi.seabeds) && detailPoi.seabeds.length ? detailPoi.seabeds.join(' / ') : text('待补充')
+        const protectionValues = Array.isArray(detailPoi.protections) ? detailPoi.protections.map((value) => value.trim().toLowerCase()).filter(Boolean) : []
+        const protectionSet = new Set(protectionValues)
+        const protectionLabels = protectionValues.length ? protectionValues.map((value) => localizeProtection(value, text)) : []
+        const protections = protectionLabels.length ? protectionLabels.join(' / ') : text('待补充')
+        const mooringTypes = Array.isArray(detailPoi.mooringTypes) && detailPoi.mooringTypes.length ? detailPoi.mooringTypes.join(' / ') : text('待补充')
+        const approachNotes = [
+          detailPoi.maxDraft ? text(isAnchorage ? '参考水深/吃水 {draft}m' : '建议吃水 {draft}m', { draft: detailPoi.maxDraft }) : null,
+          detailPoi.maxLength && !isAnchorage ? text('建议船长 {length}m', { length: detailPoi.maxLength }) : null,
+          detailPoi.maxBeam ? text('船宽 {beam}m', { beam: detailPoi.maxBeam }) : null,
+        ].filter(Boolean).join(' · ') || text('待补充')
+        const notice = detailPoi.warningNotes?.[0]?.text
+          ?? detailPoi.stayLimit
+          ?? (isHazard ? text('该区域存在限制或风险，航行前请核对当地公告与海图。') : null)
+          ?? (detailPoi.status !== 'active' ? text('该地标状态需要确认，进港前请再次核对当地公告。') : null)
+        const locationLine = detailPoi.address || detailPoi.region || detailPoi.country || text('待补充')
+        const vitals = isHazard ? [
+          [text('风险类型'), categoryLabel],
+          [text('坐标'), coordinateLabel(detailPoi)],
+          [text('区域'), detailPoi.region || detailPoi.country || text('待补充')],
+          [text('状态'), detailPoi.status === 'restricted' ? text('限制') : text('需核对')],
+        ] : isAnchorage ? [
+          [text('海床'), seabeds],
+          [text('遮蔽方向'), protectionLabels.length ? text('{count} 个方向', { count: protectionLabels.length }) : text('待补充')],
+          [text('水深'), detailPoi.maxDraft ? `${detailPoi.maxDraft}m` : text('待补充')],
+          [text('坐标'), coordinateLabel(detailPoi)],
+        ] : isBuoy ? [
+          [text('系泊'), mooringTypes],
+          [text('船长'), detailPoi.maxLength ? text('≤ {length}m', { length: detailPoi.maxLength }) : text('待补充')],
+          [text('吃水'), detailPoi.maxDraft ? `${detailPoi.maxDraft}m` : text('待补充')],
+          [text('坐标'), coordinateLabel(detailPoi)],
+        ] : isDryDock ? [
+          [text('服务'), text('上排 / 维修')],
+          [text('船长'), detailPoi.maxLength ? text('≤ {length}m', { length: detailPoi.maxLength }) : text('待补充')],
+          [text('船宽'), detailPoi.maxBeam ? `${detailPoi.maxBeam}m` : text('待补充')],
+          [text('电话'), detailPoi.phone || text('待补充')],
+        ] : [
+          [text(isQuay ? '靠泊' : '泊位'), detailPoi.maxLength ? text('≤ {length}m', { length: detailPoi.maxLength }) : text('待补充')],
+          [text('吃水'), detailPoi.maxDraft ? `${detailPoi.maxDraft}m` : text('待补充')],
+          [text('坐标'), coordinateLabel(detailPoi)],
+          ...(isMarina && detailPoi.phone ? [[text('电话'), detailPoi.phone]] : []),
+        ]
+        const amenities = isHazard || isAnchorage ? [] : isDryDock ? [
+          [text('维修'), detailPoi.hasRepair ?? true],
+          [text('上排'), true],
+          [text('垃圾'), detailPoi.hasWasteDisposal],
+          [text('可预约'), detailPoi.bookable],
+        ] as [string, boolean | undefined][] : isBuoy ? [
+          [text('浮标'), true],
+          [text('可预订'), detailPoi.bookable],
+          [text('可过夜'), detailPoi.overnightAllowed],
+        ] as [string, boolean | undefined][] : isQuay ? [
+          [text('公共靠泊'), true],
+          [text('淡水'), detailPoi.hasWater],
+          [text('垃圾'), detailPoi.hasWasteDisposal],
+          [text('可过夜'), detailPoi.overnightAllowed],
+        ] as [string, boolean | undefined][] : [
+          [text('淡水'), detailPoi.hasWater],
+          [text('岸电'), detailPoi.hasPower],
+          [text('燃油'), detailPoi.hasFuel],
+          [text('维修'), detailPoi.hasRepair],
+          [text('垃圾'), detailPoi.hasWasteDisposal],
+          [text('可预订'), detailPoi.bookable],
+        ] as [string, boolean | undefined][]
+        const conditions = isHazard ? [
+          [text('说明'), detailPoi.description || text('该地标用于标记禁锚、浅滩、礁石、限制区或其他航行风险。')],
+          [text('建议'), text('靠近前核对官方海图、航行通告和当地规定。')],
+        ] : isAnchorage ? [
+          [text('锚泊方式'), mooringTypes],
+          [text('海床'), seabeds],
+          [text('遮蔽'), protections],
+          [text('过夜'), detailPoi.overnightAllowed === false ? text('不建议') : text('可参考')],
+        ] : isBuoy ? [
+          [text('系泊方式'), mooringTypes],
+          [text('费用'), detailPoi.feeInfo || text('待补充')],
+          [text('预订'), detailPoi.bookable ? text('可预订') : text('待补充')],
+        ] : [
+          [text('泊靠条件'), approachNotes],
+          [text('费用 / 时区'), `${detailPoi.feeInfo || text('待补充')} · ${detailPoi.timezone || text('待补充')}`],
+        ]
+        const infoKicker = isHazard ? 'RISK INFO · 风险信息' : isAnchorage ? 'ANCHORAGE · 锚泊条件' : isBuoy ? 'MOORING · 浮标泊位' : isDryDock ? 'YARD INFO · 船坞维修' : isQuay ? 'QUAY INFO · 公共泊靠' : 'PORT INFO · 港口信息'
+        const detailKicker = isHazard ? 'NOTICE · 航行提示' : isAnchorage ? 'ANCHORING · 锚地说明' : isDryDock ? 'SERVICE · 服务说明' : 'DETAIL · 泊靠说明'
+        const currentNotes = poiNotes.length ? poiNotes : (detailPoi.notes ?? [])
+        const currentReviews = poiReviews
+        const reviewAverage = detailPoi.rating?.toFixed(1) ?? '—'
+        const reviewCount = Math.max(detailPoi.commentsCount ?? 0, currentReviews.length)
+        const photoKinds = ['marina', 'sail', 'sunrise', 'hero', 'crew', 'storm']
+        return (
+          <Animated.View
+            style={[s.poiSheet, sheetExpanded && s.poiSheetFull, { transform: [{ translateY: sheetTranslateY }] }]}
+            {...(!sheetExpanded ? sheetPanResponder.panHandlers : {})}
+          >
+            {!sheetExpanded ? (
+              <View style={s.sheetHandleZone}>
+                <View style={s.sheetHandle} />
+              </View>
+            ) : null}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              bounces={sheetExpanded}
+              onScroll={handleSheetScroll}
+              scrollEventThrottle={16}
+              contentContainerStyle={[s.sheetContent, sheetExpanded && s.sheetContentFull]}
+            >
+              {!sheetExpanded ? (
+                <>
+                  <View style={s.sheetHeader}>
+                    <View style={[s.sheetIcon, { backgroundColor: color }]}>
+                      <Text style={s.sheetIconText}>{iconForPoi(selectedPoi)}</Text>
+                    </View>
+                    <View style={s.sheetHeaderText}>
+                      <Text style={[s.sheetKicker, { color }]}>{categoryLabel.toUpperCase()}</Text>
+                      <Text style={s.panelTitle} numberOfLines={2}>{selectedPoi.name}</Text>
+                      <Text style={s.panelText}>{shortInfoOf(selectedPoi, text)}</Text>
+                    </View>
+                  </View>
+                  <View style={s.sheetBlock}>
+                    <Text style={s.sheetBlockText}>
+                      {selectedPoi.region || selectedPoi.country || coordinateLabel(selectedPoi)}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View style={s.detailHero}>
+                    <LinearGradient colors={['#38627c', '#17446f', '#102a4f']} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={s.detailPhotoBase} />
+                    <View style={s.detailPhotoStripeLayer}>
+                      {Array.from({ length: 30 }).map((_, index) => (
+                        <View key={index} style={[s.detailPhotoStripe, { left: index * 18 - 180, top: -70 }]} />
+                      ))}
+                    </View>
+                    <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.20)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.detailPhotoHorizon} />
+                    <Text style={s.detailPhotoLabel}>// {categoryLabel.toUpperCase()} · {detailPoi.region || detailPoi.country || 'POI'}</Text>
+                    <LinearGradient colors={['rgba(0,0,0,0.40)', 'rgba(0,0,0,0)', '#f6f4ef']} locations={[0, 0.3, 1]} style={StyleSheet.absoluteFill} pointerEvents="none" />
+                    <View style={s.heroChrome}>
+                      <TouchableOpacity style={s.heroChromeBtn} onPress={dismissSheet}>
+                        <Text style={s.heroChromeBtnText}>‹</Text>
+                      </TouchableOpacity>
+                      <View style={s.heroRightActions}>
+                        <View style={s.heroChromeBtn}>
+                          <Text style={s.heroStatusText}>♡</Text>
+                        </View>
+                        <View style={s.heroChromeBtn}>
+                          <Text style={s.heroStatusText}>↗</Text>
+                        </View>
+                      </View>
+                    </View>
+                    <View style={s.detailHeroTop}>
+                      <View style={s.detailHeroPillRow}>
+                        <View style={[s.detailHeroTypePill, { backgroundColor: `${color}cc` }]}>
+                          <Text style={s.detailHeroTypeText}>{categoryLabel.toUpperCase()}</Text>
+                        </View>
+                        <View style={s.detailHeroStatusPill}>
+                          <View style={s.detailHeroStatusDot} />
+                          <Text style={s.detailHeroStatusText}>{text('已同步')}</Text>
+                        </View>
+                      </View>
+                      <Text style={s.detailHeroTitle} numberOfLines={2}>{detailPoi.name}</Text>
+                      <View style={s.detailHeroMetaRow}>
+                        <Text style={s.detailHeroMeta}>★ {detailPoi.rating ?? '4.8'}</Text>
+                        <Text style={s.detailHeroMetaDot}>·</Text>
+                        <Text style={s.detailHeroMeta}>{detailPoi.region || detailPoi.country || text('海域待标注')}</Text>
+                        <Text style={s.detailHeroMetaDot}>·</Text>
+                        <Text style={s.detailHeroMeta}>{coordinateLabel(detailPoi)}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={s.detailBody}>
+                    {sheetDetailLoading ? (
+                      <View style={s.noteCard}>
+                        <Text style={s.sheetLoadingText}>{text('正在加载详情...')}</Text>
+                      </View>
+                    ) : null}
+
+                    {sheetDetailError ? (
+                      <View style={s.noteCard}>
+                        <Text style={s.sheetBlockTitle}>{text('详情加载失败')}</Text>
+                        <Text style={s.sheetBlockText}>{sheetDetailError}</Text>
+                      </View>
+                    ) : null}
+
+                    <View style={s.quickActionRow}>
+                      <TouchableOpacity style={s.quickActionPrimary}>
+                        <Text style={s.quickActionPrimaryText}>↗ {text('导航前往')}</Text>
+                      </TouchableOpacity>
+                      {(isMarina || isDryDock) && detailPoi.phone ? (
+                        <TouchableOpacity style={s.quickActionIconBtn}>
+                          <Text style={s.quickActionIconText}>☎</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                      <TouchableOpacity style={s.quickActionIconBtn}>
+                        <Text style={s.quickActionIconText}>☰</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={s.detailTabsRow}>
+                      {(['详情', '评价', '照片'] as const).map((tab) => {
+                        const active = detailTab === tab
+                        return (
+                          <TouchableOpacity key={tab} style={s.detailTabBtn} onPress={() => setDetailTab(tab)}>
+                            <Text style={[s.detailTabText, { color: active ? '#0d3460' : 'rgba(13,52,96,0.62)' }]}>{text(tab)}</Text>
+                            {active ? <View style={s.detailTabUnderline} /> : null}
+                          </TouchableOpacity>
+                        )
+                      })}
+                    </View>
+
+                    {detailTab === '详情' ? (
+                      <>
+                        {notice ? (
+                          <View style={s.noticeStrip}>
+                            <View style={s.noticeIcon}>
+                              <Text style={s.noticeIconText}>!</Text>
+                            </View>
+                            <Text style={s.noticeText}>{notice}</Text>
+                          </View>
+                        ) : null}
+
+                        <View style={s.cardPad}>
+                          <Text style={s.sectionKicker}>{infoKicker}</Text>
+                          <View style={s.vitalsGrid}>
+                            {vitals.map(([label, value]) => (
+                              <View key={label} style={s.vitalCell}>
+                                <Text style={s.vitalLabel}>{label}</Text>
+                                <Text style={s.vitalValue}>{value}</Text>
+                              </View>
+                            ))}
+                          </View>
+                          {isAnchorage ? (
+                            <View style={s.protectionCompassWrap}>
+                              <View style={s.protectionCompass}>
+                                <View style={s.protectionCompassRing} />
+                                <View style={s.protectionCompassCrossV} />
+                                <View style={s.protectionCompassCrossH} />
+                                {PROTECTION_DIRECTIONS.map((direction) => {
+                                  const active = protectionSet.has(direction.key)
+                                  return (
+                                    <View
+                                      key={direction.key}
+                                      style={[
+                                        s.protectionDirection,
+                                        {
+                                          left: direction.x,
+                                          top: direction.y,
+                                          backgroundColor: active ? '#059669' : 'rgba(13,52,96,0.08)',
+                                          borderColor: active ? 'rgba(255,255,255,0.90)' : 'rgba(13,52,96,0.10)',
+                                        },
+                                      ]}
+                                    >
+                                      <Text style={[s.protectionDirectionText, { color: active ? '#fff' : 'rgba(13,52,96,0.34)' }]}>{direction.short}</Text>
+                                    </View>
+                                  )
+                                })}
+                                <View style={s.protectionCenter}>
+                                  <Text style={s.protectionCenterIcon}>⌾</Text>
+                                </View>
+                              </View>
+                              <View style={s.protectionLegend}>
+                                <Text style={s.protectionLegendTitle}>{text('风浪遮蔽')}</Text>
+                                <Text style={s.protectionLegendText}>
+                                  {protectionLabels.length ? text('绿色方向表示该锚地对对应来向风浪有遮蔽。') : text('这个锚地还没有遮蔽方向数据。')}
+                                </Text>
+                                {protectionLabels.length ? (
+                                  <View style={s.protectionLegendPills}>
+                                    {protectionLabels.map((label) => (
+                                      <View key={label} style={s.protectionPill}>
+                                        <Text style={s.protectionPillText}>{label}</Text>
+                                      </View>
+                                    ))}
+                                  </View>
+                                ) : null}
+                              </View>
+                            </View>
+                          ) : null}
+                          <View style={s.addressDivider} />
+                          <Text style={s.vitalLabel}>{isHazard || isAnchorage ? text('区域') : text('位置')}</Text>
+                          <Text style={s.vitalValue}>{locationLine}</Text>
+                        </View>
+
+                        {amenities.length ? (
+                          <View style={s.cardPad}>
+                            <Text style={s.sectionKicker}>{isDryDock ? 'SERVICES · 服务' : 'AMENITIES · 设施'}</Text>
+                            <View style={s.amenitiesGrid}>
+                              {amenities.map(([label, ok]) => (
+                                <View key={label} style={s.amenityTile}>
+                                  <Text style={[s.amenityValue, { color: ok ? '#059669' : 'rgba(13,52,96,0.32)' }]}>{ok ? '✓' : '—'}</Text>
+                                  <Text style={s.amenityLabel}>{label}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          </View>
+                        ) : null}
+
+                        <View style={s.cardPad}>
+                          <Text style={s.sectionKicker}>{detailKicker}</Text>
+                          <Text style={s.sheetBlockText}>
+                            {detailPoi.description || text('这条地标目前已完成基础同步，详细泊靠说明和实拍补充还在整理中。')}
+                          </Text>
+                          <View style={s.addressDivider} />
+                          {conditions.map(([label, value], index) => (
+                            <View key={label} style={index > 0 ? { marginTop: 10 } : null}>
+                              <Text style={s.vitalLabel}>{label}</Text>
+                              <Text style={s.vitalValue}>{value}</Text>
+                            </View>
+                          ))}
+                        </View>
+
+                        <View style={s.cardPad}>
+                          <View style={s.noteHeaderRow}>
+                            <Text style={[s.sectionKicker, { marginBottom: 0 }]}>{text('NOTES · 备注与提醒')}</Text>
+                            <TouchableOpacity onPress={() => setAddingNote((current) => !current)}>
+                              <Text style={s.inlineActionText}>{addingNote ? text('收起') : text('添加')}</Text>
+                            </TouchableOpacity>
+                          </View>
+
+                          {addingNote ? (
+                            <View style={s.noteComposer}>
+                              <View style={s.noteTypeRow}>
+                                {(['info', 'warning'] as const).map((type) => {
+                                  const active = noteType === type
+                                  return (
+                                    <TouchableOpacity
+                                      key={type}
+                                      style={[s.noteTypeChip, active && (type === 'warning' ? s.noteTypeChipWarn : s.noteTypeChipActive)]}
+                                      onPress={() => setNoteType(type)}
+                                    >
+                                      <Text style={[s.noteTypeChipText, active && s.noteTypeChipTextActive]}>
+                                        {type === 'warning' ? text('警告') : text('普通')}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  )
+                                })}
+                              </View>
+                              <TextInput
+                                value={noteText}
+                                onChangeText={setNoteText}
+                                placeholder={text('记录实地提醒、停泊注意事项或临时变化')}
+                                placeholderTextColor="rgba(13,52,96,0.38)"
+                                multiline
+                                style={s.noteInput}
+                              />
+                              <TouchableOpacity
+                                style={[s.submitBtn, (!noteText.trim() || submittingNote) && s.submitBtnDisabled]}
+                                disabled={!noteText.trim() || submittingNote}
+                                onPress={() => void submitSheetNote(detailPoi.id)}
+                              >
+                                <Text style={s.submitBtnText}>{submittingNote ? text('提交中') : text('发布备注')}</Text>
+                              </TouchableOpacity>
+                            </View>
+                          ) : null}
+
+                          {currentNotes.length ? currentNotes.map((note) => {
+                            const warning = note.noteType === 'warning'
+                            const canDelete = !!user?.id && note.createdBy === user.id
+                            return (
+                              <View key={note.id} style={[s.noteItem, warning && s.noteItemWarn]}>
+                                <View style={s.noteItemTop}>
+                                  <Text style={[s.noteBadge, warning && s.noteBadgeWarn]}>
+                                    {warning ? text('警告提醒') : text('航友备注')}
+                                    {note.createdByRole ? ` · ${note.createdByRole}` : ''}
+                                  </Text>
+                                  {canDelete ? (
+                                    <TouchableOpacity onPress={() => void removeSheetNote(detailPoi.id, note.id)}>
+                                      <Text style={s.noteDeleteText}>{text('删除')}</Text>
+                                    </TouchableOpacity>
+                                  ) : null}
+                                </View>
+                                <Text style={s.noteBody}>{note.text}</Text>
+                              </View>
+                            )
+                          }) : (
+                            <Text style={s.emptyText}>{text('还没有备注。到过这里的航友可以补充实地提醒。')}</Text>
+                          )}
+                        </View>
+                      </>
+                    ) : null}
+
+                    {detailTab === '评价' ? (
+                      <View style={s.cardPad}>
+                        <View style={s.ratingSummary}>
+                          <View>
+                            <Text style={s.ratingBig}>★ {reviewAverage}</Text>
+                            <Text style={s.ratingCaption}>{text('{count} 条评价', { count: reviewCount })}</Text>
+                          </View>
+                          <Text style={s.reviewStars}>{'★'.repeat(Math.max(0, Math.round(detailPoi.rating ?? 0)))}{'☆'.repeat(Math.max(0, 5 - Math.round(detailPoi.rating ?? 0)))}</Text>
+                        </View>
+
+                        <View style={s.reviewComposer}>
+                          <Text style={s.noteBadge}>{text('我的评价')}</Text>
+                          <View style={s.starRow}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <TouchableOpacity key={star} style={s.starBtn} onPress={() => setMyRating(star)}>
+                                <Text style={[s.starText, myRating >= star && s.starTextOn]}>★</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                          <TextInput
+                            value={myComment}
+                            onChangeText={setMyComment}
+                            placeholder={text('写下靠泊体验、海况、服务或避风感受')}
+                            placeholderTextColor="rgba(13,52,96,0.38)"
+                            multiline
+                            style={s.noteInput}
+                          />
+                          <TouchableOpacity
+                            style={[s.submitBtn, (myRating < 1 || savingReview) && s.submitBtnDisabled]}
+                            disabled={myRating < 1 || savingReview}
+                            onPress={() => void submitSheetReview(detailPoi.id)}
+                          >
+                            <Text style={s.submitBtnText}>{savingReview ? text('提交中') : text('提交评价')}</Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {currentReviews.length ? currentReviews.map((review) => (
+                          <View key={review.id} style={s.reviewItem}>
+                            <View style={s.reviewTop}>
+                              <View style={s.reviewAvatar}>
+                                <Text style={s.reviewAvatarText}>{(review.user?.nickname || 'U').slice(0, 1).toUpperCase()}</Text>
+                              </View>
+                              <View>
+                                <Text style={s.reviewName}>{review.user?.nickname || text('航友')}</Text>
+                                <Text style={s.reviewStars}>{'★'.repeat(review.rating)}{'☆'.repeat(Math.max(0, 5 - review.rating))}</Text>
+                              </View>
+                            </View>
+                            <Text style={s.reviewText}>{review.comment || text('这位航友只留下了评分。')}</Text>
+                          </View>
+                        )) : (
+                          <Text style={s.emptyText}>{text('暂无评价。你可以成为第一个补充实地体验的人。')}</Text>
+                        )}
+                      </View>
+                    ) : null}
+
+                    {detailTab === '照片' ? (
+                      <View style={s.photoGrid}>
+                        {photoKinds.map((kind, index) => (
+                          <View key={`${kind}-${index}`} style={s.photoTile}>
+                            <LinearGradient
+                              colors={index % 3 === 0 ? ['#765444', '#23335e', '#152342'] : index % 3 === 1 ? ['#b9c9d2', '#38627c', '#173457'] : ['#17446f', '#102a4f']}
+                              start={{ x: 0.1, y: 0 }}
+                              end={{ x: 0.9, y: 1 }}
+                              style={StyleSheet.absoluteFill}
+                            />
+                            <View style={s.photoTileStripeLayer}>
+                              {Array.from({ length: 10 }).map((_, stripeIndex) => (
+                                <View key={stripeIndex} style={[s.photoTileStripe, { left: stripeIndex * 17 - 60, top: -24 }]} />
+                              ))}
+                            </View>
+                            <View style={s.photoTileHorizon} />
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
+                </>
+              )}
+            </ScrollView>
+          </Animated.View>
+        )
+      })() : null}
     </View>
   )
 }

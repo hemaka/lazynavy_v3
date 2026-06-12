@@ -396,9 +396,12 @@ export default function PoiDetailScreen() {
   const color = colorForCategory(poi.category)
   const categoryLabel = labelForCategory(poi.category, text)
   const metaTags = metaTagsOf(poi, text)
-  const seabeds = poi.seabeds.length ? poi.seabeds.map((value) => localizeSeabed(value, text)) : [text('海床信息待补')]
-  const protections = poi.protections.length ? poi.protections : [text('风浪遮蔽信息待补')]
-  const moorings = poi.mooringTypes.length ? poi.mooringTypes.map((value) => localizeMooring(value, text)) : [text('锚泊方式待补')]
+  const poiSeabeds = Array.isArray(poi.seabeds) ? poi.seabeds : []
+  const poiProtections = Array.isArray(poi.protections) ? poi.protections : []
+  const poiMooringTypes = Array.isArray(poi.mooringTypes) ? poi.mooringTypes : []
+  const seabeds = poiSeabeds.length ? poiSeabeds.map((value) => localizeSeabed(value, text)) : [text('海床信息待补')]
+  const protections = poiProtections.length ? poiProtections : [text('风浪遮蔽信息待补')]
+  const moorings = poiMooringTypes.length ? poiMooringTypes.map((value) => localizeMooring(value, text)) : [text('锚泊方式待补')]
   const offlineFallback = offlineMode ? text('离线状态不可读') : text('待补充')
 
   return (
@@ -542,15 +545,15 @@ export default function PoiDetailScreen() {
             <View style={s.infoGrid}>
               <View style={s.infoItem}>
                 <Text style={s.infoLabel}>SEABED</Text>
-                <Text style={s.infoValue}>{poi.seabeds.length ? seabeds.join(' / ') : offlineFallback}</Text>
+                <Text style={s.infoValue}>{poiSeabeds.length ? seabeds.join(' / ') : offlineFallback}</Text>
               </View>
               <View style={s.infoItem}>
                 <Text style={s.infoLabel}>PROTECTION</Text>
-                <Text style={s.infoValue}>{poi.protections.length ? protections.join(' / ') : offlineFallback}</Text>
+                <Text style={s.infoValue}>{poiProtections.length ? protections.join(' / ') : offlineFallback}</Text>
               </View>
               <View style={s.infoItem}>
                 <Text style={s.infoLabel}>MOORING</Text>
-                <Text style={s.infoValue}>{poi.mooringTypes.length ? moorings.join(' / ') : offlineFallback}</Text>
+                <Text style={s.infoValue}>{poiMooringTypes.length ? moorings.join(' / ') : offlineFallback}</Text>
               </View>
             </View>
           </View>
