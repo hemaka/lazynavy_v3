@@ -11,6 +11,7 @@ import { BottomNavTransitionProvider, useBottomNavTransition } from '../navigati
 import { bottomNavIndexForPath } from '../navigation/navConfig'
 import { BottomTabBar } from '../shared/ui/BottomTabBar'
 import { useTheme } from '../theme'
+import { I18nProvider, useI18n } from '../i18n'
 
 function RootStack() {
   const t = useTheme()
@@ -59,6 +60,7 @@ function Gate() {
 
 function AppLockGate() {
   const t = useTheme()
+  const { text } = useI18n()
   const [locked, setLocked] = useState(false)
   const [password, setPassword] = useState('')
   const [expectedPassword, setExpectedPassword] = useState('')
@@ -100,19 +102,19 @@ function AppLockGate() {
     const hasHardware = await LocalAuthentication.hasHardwareAsync()
     const enrolled = await LocalAuthentication.isEnrolledAsync()
     if (!hasHardware || !enrolled) {
-      setError('当前设备暂不支持可用的生物识别。')
+      setError(text('当前设备暂不支持可用的生物识别。'))
       return
     }
     authenticatingRef.current = true
     ignoreNextActiveRef.current = true
     setError('')
     try {
-      const result = await LocalAuthentication.authenticateAsync({ promptMessage: '解锁 LazyNavy' })
+      const result = await LocalAuthentication.authenticateAsync({ promptMessage: text('解锁 LazyNavy') })
       if (result.success) {
         setPassword('')
         setLockState(false)
       } else {
-        setError('面部/指纹解锁未完成，请重试或输入保护密码。')
+        setError(text('面部/指纹解锁未完成，请重试或输入保护密码。'))
       }
     } finally {
       authenticatingRef.current = false
@@ -128,30 +130,30 @@ function AppLockGate() {
       setPassword('')
       return
     }
-    setError('保护密码不正确')
+    setError(text('保护密码不正确'))
   }
 
   return (
     <Modal visible={locked} transparent animationType="fade">
       <View style={lockStyles.layer}>
         <View style={[lockStyles.card, { backgroundColor: t.surface, borderColor: t.border }]}>
-          <Text style={[lockStyles.title, { color: t.text }]}>输入保护密码</Text>
+          <Text style={[lockStyles.title, { color: t.text }]}>{text('输入保护密码')}</Text>
           <TextInput
             value={password}
             onChangeText={setPassword}
             secureTextEntry
-            placeholder="保护密码"
+            placeholder={text('保护密码')}
             placeholderTextColor={t.textDim}
             style={[lockStyles.input, { backgroundColor: t.surfaceAlt, borderColor: t.border, color: t.text }]}
             onSubmitEditing={unlockWithPassword}
           />
           {error ? <Text style={[lockStyles.error, { color: t.danger }]}>{error}</Text> : null}
           <Pressable style={[lockStyles.primary, { backgroundColor: t.accent }]} onPress={unlockWithPassword}>
-            <Text style={lockStyles.primaryText}>解锁</Text>
+            <Text style={lockStyles.primaryText}>{text('解锁')}</Text>
           </Pressable>
           {biometricEnabled && (
             <Pressable style={[lockStyles.secondary, { borderColor: t.border }]} onPress={() => void unlockWithBiometric()}>
-              <Text style={[lockStyles.secondaryText, { color: t.text }]}>使用面部/指纹解锁</Text>
+              <Text style={[lockStyles.secondaryText, { color: t.text }]}>{text('使用面部/指纹解锁')}</Text>
             </Pressable>
           )}
         </View>
@@ -163,10 +165,12 @@ function AppLockGate() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <StatusBar style="dark" translucent />
-      <LocationProvider>
-        <Gate />
-      </LocationProvider>
+      <I18nProvider>
+        <StatusBar style="dark" translucent />
+        <LocationProvider>
+          <Gate />
+        </LocationProvider>
+      </I18nProvider>
     </AuthProvider>
   )
 }

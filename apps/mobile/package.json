@@ -1,6 +1,6 @@
 {
   "name": "@lazynavy-v3/mobile",
-  "version": "1.0.1.6",
+  "version": "1.0.1.10",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useTheme } from '../../../theme'
 import { useAuth } from '../context'
+import { useI18n } from '../../../i18n'
 
 interface Props {
   visible: boolean
@@ -11,6 +12,7 @@ interface Props {
 
 export function AuthModal({ visible, initialMode = 'login', onClose }: Props) {
   const t = useTheme()
+  const { text, tr } = useI18n()
   const { login, register } = useAuth()
   const [mode, setMode] = useState(initialMode)
   const [nickname, setNickname] = useState('')
@@ -54,16 +56,16 @@ export function AuthModal({ visible, initialMode = 'login', onClose }: Props) {
 
   function showError(message: string) {
     setFormError(message)
-    if (Platform.OS !== 'web') Alert.alert('提示', message)
+    if (Platform.OS !== 'web') Alert.alert(tr('common.notice'), message)
   }
 
   async function submit() {
     if (!identifier.trim() || !password.trim()) {
-      showError('请填写邮箱/手机号和密码')
+      showError(tr('auth.fillIdentifierPassword'))
       return
     }
     if (mode === 'register' && !nickname.trim()) {
-      showError('请填写昵称')
+      showError(tr('auth.fillNickname'))
       return
     }
 
@@ -74,7 +76,7 @@ export function AuthModal({ visible, initialMode = 'login', onClose }: Props) {
       else await login(identifier, password)
       close()
     } catch (error: any) {
-      showError(error?.message ?? (mode === 'login' ? '登录失败' : '注册失败'))
+      showError(error?.message ?? (mode === 'login' ? tr('auth.loginFailed') : tr('auth.registerFailed')))
     } finally {
       setLoading(false)
     }
@@ -86,25 +88,25 @@ export function AuthModal({ visible, initialMode = 'login', onClose }: Props) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'position' : undefined}>
         <View style={s.sheet}>
           <View style={s.handle} />
-          <Text style={s.title}>{mode === 'login' ? '登录 LazyNavy' : '注册 LazyNavy'}</Text>
-          <Text style={s.subtitle}>{mode === 'login' ? '登录后继续同步你的航海资料。' : '新账号会立即进入当前航海工作区。'}</Text>
+          <Text style={s.title}>{mode === 'login' ? tr('auth.login') : tr('auth.register')} LazyNavy</Text>
+          <Text style={s.subtitle}>{mode === 'login' ? text('登录后继续同步你的航海资料。') : text('新账号会立即进入当前航海工作区。')}</Text>
 
           {mode === 'register' && (
-            <TextInput style={[s.input, formError && s.inputError]} placeholder="昵称" placeholderTextColor={t.textSoft} value={nickname} onChangeText={(value) => { setNickname(value); if (formError) setFormError(null) }} autoCapitalize="none" />
+            <TextInput style={[s.input, formError && s.inputError]} placeholder={tr('auth.nickname')} placeholderTextColor={t.textSoft} value={nickname} onChangeText={(value) => { setNickname(value); if (formError) setFormError(null) }} autoCapitalize="none" />
           )}
-          <TextInput style={[s.input, formError && s.inputError]} placeholder="邮箱 / 手机号" placeholderTextColor={t.textSoft} value={identifier} onChangeText={(value) => { setIdentifier(value); if (formError) setFormError(null) }} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
-          <TextInput style={[s.input, formError && s.inputError]} placeholder="密码" placeholderTextColor={t.textSoft} value={password} onChangeText={(value) => { setPassword(value); if (formError) setFormError(null) }} secureTextEntry />
+          <TextInput style={[s.input, formError && s.inputError]} placeholder={tr('auth.identifier')} placeholderTextColor={t.textSoft} value={identifier} onChangeText={(value) => { setIdentifier(value); if (formError) setFormError(null) }} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
+          <TextInput style={[s.input, formError && s.inputError]} placeholder={tr('auth.password')} placeholderTextColor={t.textSoft} value={password} onChangeText={(value) => { setPassword(value); if (formError) setFormError(null) }} secureTextEntry />
 
           {formError && <View style={s.errorBox}><Text style={s.errorText} selectable>{formError}</Text></View>}
 
           <Pressable style={[s.primary, loading && s.primaryDisabled]} onPress={submit} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryText}>{mode === 'login' ? '登录' : '注册'}</Text>}
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryText}>{mode === 'login' ? tr('auth.login') : tr('auth.register')}</Text>}
           </Pressable>
 
           <Pressable onPress={() => { setMode(mode === 'login' ? 'register' : 'login'); reset() }}>
             <Text style={s.switchText}>
-              {mode === 'login' ? '没有账号？' : '已有账号？'}
-              <Text style={s.switchLink}>{mode === 'login' ? ' 立即注册' : ' 去登录'}</Text>
+              {mode === 'login' ? tr('auth.noAccount') : tr('auth.hasAccount')}
+              <Text style={s.switchLink}>{mode === 'login' ? tr('auth.registerNow') : tr('auth.goLogin')}</Text>
             </Text>
           </Pressable>
         </View>

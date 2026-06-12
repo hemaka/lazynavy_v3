@@ -4,6 +4,7 @@ import { Animated, Pressable, StyleSheet, Text } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { bottomNav, isBottomNavActive } from '../../navigation/navConfig'
 import { useBottomNavTransition } from '../../navigation/bottomNavTransition'
+import { useI18n } from '../../i18n'
 import { colors } from '../../theme/tokens'
 import { IconGlyph } from './IconGlyph'
 
@@ -11,6 +12,7 @@ export function BottomTabBar() {
   const insets = useSafeAreaInsets()
   const pathname = usePathname()
   const { bottomNavHidden, navigateBottomNav } = useBottomNavTransition()
+  const { text } = useI18n()
   const bottom = Math.max(insets.bottom, 8)
   const navTranslateY = useRef(new Animated.Value(0)).current
 
@@ -38,7 +40,7 @@ export function BottomTabBar() {
             onPress={() => navigateBottomNav(item.href, pathname)}
           >
             <IconGlyph name={item.icon} color={active ? colors.ink : colors.accent} size={24} />
-            <Text style={[styles.navText, active && styles.navTextActive]}>{item.label}</Text>
+            <Text style={[styles.navText, active && styles.navTextActive]}>{text(item.label)}</Text>
           </Pressable>
         )
       })}

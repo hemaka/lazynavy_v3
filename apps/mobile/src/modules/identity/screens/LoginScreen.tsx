@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useAuth } from '../context'
 import { useTheme } from '../../../theme'
+import { useI18n } from '../../../i18n'
 
 type Mode = 'login' | 'register'
 
 export function LoginScreen() {
   const t = useTheme()
+  const { text, tr } = useI18n()
   const { register, login } = useAuth()
   const [mode, setMode] = useState<Mode>('login')
   const [nickname, setNickname] = useState('')
@@ -45,16 +47,16 @@ export function LoginScreen() {
 
   function showError(message: string) {
     setFormError(message)
-    if (Platform.OS !== 'web') Alert.alert('提示', message)
+    if (Platform.OS !== 'web') Alert.alert(tr('common.notice'), message)
   }
 
   async function submit() {
     if (!identifier.trim() || !password.trim()) {
-      showError('请填写邮箱/手机号和密码')
+      showError(tr('auth.fillIdentifierPassword'))
       return
     }
     if (mode === 'register' && !nickname.trim()) {
-      showError('请填写昵称')
+      showError(tr('auth.fillNickname'))
       return
     }
 
@@ -64,7 +66,7 @@ export function LoginScreen() {
       if (mode === 'register') await register(nickname, identifier, password)
       else await login(identifier, password)
     } catch (error: any) {
-      showError(error?.message ?? (mode === 'login' ? '登录失败' : '注册失败'))
+      showError(error?.message ?? (mode === 'login' ? tr('auth.loginFailed') : tr('auth.registerFailed')))
     } finally {
       setLoading(false)
     }
@@ -77,9 +79,9 @@ export function LoginScreen() {
         <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" contentContainerStyle={s.scroll}>
           <View style={{ gap: 8 }}>
             <Text style={s.brand} selectable>LAZYNAVY</Text>
-            <Text style={s.title}>{mode === 'login' ? '欢迎回来' : '加入 LazyNavy'}</Text>
+            <Text style={s.title}>{mode === 'login' ? tr('auth.welcomeBack') : tr('auth.join')}</Text>
             <Text style={s.subtitle}>
-              {mode === 'login' ? '登录后同步你的船只、航程、地标收藏和船务资料。' : '创建账号，开始管理你的航海生活。'}
+              {mode === 'login' ? text('登录后同步你的船只、航程、地标收藏和船务资料。') : text('创建账号，开始管理你的航海生活。')}
             </Text>
           </View>
 
@@ -87,7 +89,7 @@ export function LoginScreen() {
             {mode === 'register' && (
               <TextInput
                 style={[s.input, formError && s.inputError]}
-                placeholder="昵称"
+                placeholder={tr('auth.nickname')}
                 placeholderTextColor={t.textSoft}
                 value={nickname}
                 onChangeText={(value) => { setNickname(value); if (formError) setFormError(null) }}
@@ -96,7 +98,7 @@ export function LoginScreen() {
             )}
             <TextInput
               style={[s.input, formError && s.inputError]}
-              placeholder="邮箱 / 手机号"
+              placeholder={tr('auth.identifier')}
               placeholderTextColor={t.textSoft}
               value={identifier}
               onChangeText={(value) => { setIdentifier(value); if (formError) setFormError(null) }}
@@ -106,7 +108,7 @@ export function LoginScreen() {
             />
             <TextInput
               style={[s.input, formError && s.inputError]}
-              placeholder="密码"
+              placeholder={tr('auth.password')}
               placeholderTextColor={t.textSoft}
               value={password}
               onChangeText={(value) => { setPassword(value); if (formError) setFormError(null) }}
@@ -116,18 +118,18 @@ export function LoginScreen() {
             {formError && <View style={s.errorBox}><Text style={s.errorText} selectable>{formError}</Text></View>}
 
             <Pressable style={[s.primary, loading && s.primaryDisabled]} onPress={submit} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryText}>{mode === 'login' ? '登录' : '注册'}</Text>}
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryText}>{mode === 'login' ? tr('auth.login') : tr('auth.register')}</Text>}
             </Pressable>
           </View>
 
           <Pressable style={s.switchRow} onPress={() => reset(mode === 'login' ? 'register' : 'login')}>
             <Text style={s.switchText}>
-              {mode === 'login' ? '没有账号？' : '已有账号？'}
-              <Text style={s.switchLink}>{mode === 'login' ? ' 立即注册' : ' 去登录'}</Text>
+              {mode === 'login' ? tr('auth.noAccount') : tr('auth.hasAccount')}
+              <Text style={s.switchLink}>{mode === 'login' ? tr('auth.registerNow') : tr('auth.goLogin')}</Text>
             </Text>
           </Pressable>
 
-          <Text style={s.note} selectable>当前版本使用邮箱/手机号 + 密码登录；第三方登录后续接入。</Text>
+          <Text style={s.note} selectable>{text('当前版本使用邮箱/手机号 + 密码登录；第三方登录后续接入。')}</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

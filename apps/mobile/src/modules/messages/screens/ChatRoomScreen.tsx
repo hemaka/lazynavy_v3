@@ -21,6 +21,7 @@ import type { ChatMessage, ChatRoom } from '../api/client'
 import { createChatSocket, getChatRoomApi, listChatMessagesApi, markChatRoomReadApi, sendChatMessageApi } from '../api/client'
 import { formatChatTime, hueForId, roomInitial, roomSubtitle, roomTitle } from '../utils/present'
 import { useTheme } from '../../../theme'
+import { useI18n } from '../../../i18n'
 
 function makeClientMessageId() {
   return `mobile-${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -40,6 +41,7 @@ export default function ChatRoomScreen({
   onClose?: () => void
 } = {}) {
   const t = useTheme()
+  const { text: translateText } = useI18n()
   const { id } = useLocalSearchParams<{ id: string }>()
   const routeRoomId = Array.isArray(id) ? id[0] : id
   const roomId = roomIdOverride ?? routeRoomId
@@ -75,7 +77,7 @@ export default function ChatRoomScreen({
       if (last) void markChatRoomReadApi(roomId, token, last.id)
       requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: false }))
     } catch (err: any) {
-      setError(err?.message ?? '加载聊天失败')
+      setError(err?.message ?? translateText('加载聊天失败'))
     } finally {
       setLoading(false)
     }
@@ -134,26 +136,26 @@ export default function ChatRoomScreen({
       }
     } catch (err: any) {
       setText(trimmed)
-      Alert.alert('发送失败', err?.message ?? '请稍后重试')
+      Alert.alert(translateText('发送失败'), err?.message ?? translateText('请稍后重试'))
     } finally {
       setSending(false)
     }
   }
 
-  const title = room ? roomTitle(room, user?.id) : '聊天'
+  const title = room ? roomTitle(room, user?.id, translateText) : translateText('聊天')
 
   if (!ready || loading) {
-    return <StateScreen text="正在读取聊天..." styles={styles} color={t.accent} />
+    return <StateScreen text={translateText('正在读取聊天...')} styles={styles} color={t.accent} />
   }
 
   if (!token) {
     return (
       <SafeAreaView style={styles.screen}>
         <View style={styles.stateWrap}>
-          <Text style={styles.stateTitle}>登录后查看聊天</Text>
-          <Text style={styles.stateText}>聊天消息需要登录后同步。</Text>
+          <Text style={styles.stateTitle}>{translateText('登录后查看聊天')}</Text>
+          <Text style={styles.stateText}>{translateText('聊天消息需要登录后同步。')}</Text>
           <Pressable style={styles.stateBtn} onPress={() => setAuthVisible(true)}>
-            <Text style={styles.stateBtnText}>登录 / 注册</Text>
+            <Text style={styles.stateBtnText}>{translateText('登录 / 注册')}</Text>
           </Pressable>
         </View>
         <AuthModal visible={authVisible} onClose={() => setAuthVisible(false)} />
@@ -164,12 +166,12 @@ export default function ChatRoomScreen({
   if (error || !room) {
     return (
       <SafeAreaView style={styles.screen}>
-        <Header title="聊天不可用" subtitle="REST" roomId={roomId ?? 'error'} styles={styles} onBack={onBack} onClose={onClose} />
+        <Header title={translateText('聊天不可用')} subtitle="REST" roomId={roomId ?? 'error'} styles={styles} onBack={onBack} onClose={onClose} />
         <View style={styles.stateWrap}>
-          <Text style={styles.stateTitle}>加载失败</Text>
-          <Text style={styles.stateText}>{error ?? '聊天房间不存在'}</Text>
+          <Text style={styles.stateTitle}>{translateText('加载失败')}</Text>
+          <Text style={styles.stateText}>{error ?? translateText('聊天房间不存在')}</Text>
           <Pressable style={styles.stateBtn} onPress={() => void load()}>
-            <Text style={styles.stateBtnText}>重试</Text>
+            <Text style={styles.stateBtnText}>{translateText('重试')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -180,7 +182,7 @@ export default function ChatRoomScreen({
     <SafeAreaView style={styles.screen}>
       <StatusBar barStyle={t.statusDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Header title={title} subtitle={socketReady ? 'LIVE · 实时连接' : `${roomSubtitle(room)} · REST`} roomId={room.id} styles={styles} onBack={onBack} onClose={onClose} />
+        <Header title={title} subtitle={socketReady ? translateText('LIVE · 实时连接') : `${roomSubtitle(room, translateText)} · REST`} roomId={room.id} styles={styles} onBack={onBack} onClose={onClose} />
         <ScrollView
           ref={scrollRef}
           style={styles.scroll}
@@ -190,18 +192,18 @@ export default function ChatRoomScreen({
         >
           {messages.length === 0 ? (
             <View style={styles.stateWrap}>
-              <Text style={styles.stateTitle}>还没有消息</Text>
-              <Text style={styles.stateText}>发出第一条消息，开始这个房间的讨论。</Text>
+              <Text style={styles.stateTitle}>{translateText('还没有消息')}</Text>
+              <Text style={styles.stateText}>{translateText('发出第一条消息，开始这个房间的讨论。')}</Text>
             </View>
           ) : messages.map((message) => (
-            <MessageBubble key={message.id} message={message} currentUserId={user?.id} isGroup={room.type !== 'DIRECT'} styles={styles} />
+            <MessageBubble key={message.id} message={message} currentUserId={user?.id} isGroup={room.type !== 'DIRECT'} styles={styles} text={translateText} />
           ))}
         </ScrollView>
         <View style={styles.inputBar}>
           <TextInput
             value={text}
             onChangeText={setText}
-            placeholder="发送消息..."
+            placeholder={translateText('发送消息...')}
             placeholderTextColor={t.textSoft}
             multiline
             style={styles.input}
@@ -301,11 +303,11 @@ function Header({
   )
 }
 
-function MessageBubble({ message, currentUserId, isGroup, styles }: { message: ChatMessage; currentUserId?: string | null; isGroup: boolean; styles: ChatRoomStyles }) {
+function MessageBubble({ message, currentUserId, isGroup, styles, text }: { message: ChatMessage; currentUserId?: string | null; isGroup: boolean; styles: ChatRoomStyles; text: (source: string) => string }) {
   const me = !!currentUserId && message.senderId === currentUserId
   return (
     <View style={[styles.bubbleWrap, me ? styles.bubbleMe : styles.bubbleThem]}>
-      {!me && isGroup ? <Text style={styles.senderName}>{message.sender?.nickname ?? '成员'}</Text> : null}
+      {!me && isGroup ? <Text style={styles.senderName}>{message.sender?.nickname ?? text('成员')}</Text> : null}
       <View style={[styles.bubble, me ? styles.bubbleBgMe : styles.bubbleBgThem]}>
         <Text style={me ? styles.bubbleTextMe : styles.bubbleTextThem}>{message.text || `[${message.type}]`}</Text>
       </View>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { useI18n } from '../../i18n'
 
 export interface CountryRegionValue {
   country: string
@@ -55,6 +56,7 @@ const COUNTRIES: CountryOption[] = [
 ]
 
 export function CountryRegionPicker({ visible, country, region, onClose, onChange }: Props) {
+  const { text } = useI18n()
   const [query, setQuery] = useState('')
   const [selectedCountry, setSelectedCountry] = useState(country || '')
   const [selectedRegion, setSelectedRegion] = useState(region || '')
@@ -90,26 +92,26 @@ export function CountryRegionPicker({ visible, country, region, onClose, onChang
       <View style={styles.screen}>
         <View style={styles.nav}>
           <Pressable style={styles.navButton} onPress={onClose}>
-            <Text style={styles.navText}>取消</Text>
+            <Text style={styles.navText}>{text('取消')}</Text>
           </Pressable>
-          <Text style={styles.navTitle}>国家和地区</Text>
+          <Text style={styles.navTitle}>{text('国家和地区')}</Text>
           <Pressable style={styles.navButton} onPress={() => save()}>
-            <Text style={styles.doneText}>完成</Text>
+            <Text style={styles.doneText}>{text('完成')}</Text>
           </Pressable>
         </View>
 
         <View style={styles.searchWrap}>
-          <TextInput value={query} onChangeText={setQuery} placeholder="搜索国家、地区" placeholderTextColor="rgba(60,60,67,0.46)" style={styles.searchInput} />
+          <TextInput value={query} onChangeText={setQuery} placeholder={text('搜索国家、地区')} placeholderTextColor="rgba(60,60,67,0.46)" style={styles.searchInput} />
         </View>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Text style={styles.sectionTitle}>国家或地区</Text>
+          <Text style={styles.sectionTitle}>{text('国家或地区')}</Text>
           <View style={styles.group}>
             {countryOptions.map((item) => {
               const active = selectedCountry === item.label
               return (
                 <Pressable key={item.code} style={styles.row} onPress={() => selectCountry(item)}>
-                  <Text style={styles.rowTitle}>{item.label}</Text>
+                  <Text style={styles.rowTitle}>{text(item.label)}</Text>
                   <View style={styles.rowRight}>
                     <Text style={styles.rowMeta}>{item.code}</Text>
                     {active ? <Text style={styles.check}>✓</Text> : null}
@@ -121,10 +123,10 @@ export function CountryRegionPicker({ visible, country, region, onClose, onChang
 
           {selectedCountry ? (
             <>
-              <Text style={styles.sectionTitle}>地区</Text>
+              <Text style={styles.sectionTitle}>{text('地区')}</Text>
               <View style={styles.group}>
                 <Pressable style={styles.row} onPress={() => save(selectedCountry, '')}>
-                  <Text style={styles.rowTitle}>不设置地区</Text>
+                  <Text style={styles.rowTitle}>{text('不设置地区')}</Text>
                   {!selectedRegion ? <Text style={styles.check}>✓</Text> : null}
                 </Pressable>
                 {regions.map((item) => {

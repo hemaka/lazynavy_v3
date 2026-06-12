@@ -41,11 +41,61 @@ import {
   type LocalProfileSettings,
 } from '../settings/profileSettings'
 import { useTheme } from '../../../theme'
+import { useI18n } from '../../../i18n'
 
 type ProfilePanel = 'profile' | 'security' | 'appearance' | 'privacy'
 type MediaKind = 'avatar' | 'cover'
+type LanguagePickerKind = 'speech' | 'ui'
+type LanguageOption = { value: string; label: string; detail: string }
+type SourceTextFn = (source: string, vars?: Record<string, string | number>) => string
 
 const PRIVATE_BIRTH_DATE = '1900-01-01'
+
+const SPEECH_LANGUAGE_OPTIONS: LanguageOption[] = [
+  { value: 'zh-CN', label: 'Mandarin Chinese', detail: '普通话' },
+  { value: 'zh-HK', label: 'Cantonese', detail: '粤语' },
+  { value: 'en-US', label: 'American English', detail: 'English (US)' },
+  { value: 'en-GB', label: 'British English', detail: 'English (UK)' },
+  { value: 'en-AU', label: 'Australian English', detail: 'English (AU)' },
+  { value: 'ja-JP', label: 'Japanese', detail: '日本語' },
+  { value: 'ko-KR', label: 'Korean', detail: '한국어' },
+  { value: 'es-ES', label: 'Spanish', detail: 'Español' },
+  { value: 'fr-FR', label: 'French', detail: 'Français' },
+  { value: 'de-DE', label: 'German', detail: 'Deutsch' },
+  { value: 'it-IT', label: 'Italian', detail: 'Italiano' },
+  { value: 'pt-PT', label: 'Portuguese', detail: 'Português' },
+  { value: 'ru-RU', label: 'Russian', detail: 'Русский' },
+  { value: 'ar', label: 'Arabic', detail: 'العربية' },
+  { value: 'hi-IN', label: 'Hindi', detail: 'हिन्दी' },
+  { value: 'id-ID', label: 'Indonesian', detail: 'Bahasa Indonesia' },
+  { value: 'ms-MY', label: 'Malay', detail: 'Bahasa Melayu' },
+  { value: 'th-TH', label: 'Thai', detail: 'ไทย' },
+  { value: 'vi-VN', label: 'Vietnamese', detail: 'Tiếng Việt' },
+  { value: 'tl-PH', label: 'Filipino', detail: 'Filipino' },
+]
+
+const UI_LANGUAGE_OPTIONS: LanguageOption[] = [
+  { value: 'zh-CN', label: '简体中文', detail: 'Chinese Simplified' },
+  { value: 'zh-TW', label: '繁體中文', detail: 'Chinese Traditional' },
+  { value: 'en', label: 'English', detail: 'English' },
+  { value: 'ja', label: '日本語', detail: 'Japanese' },
+  { value: 'ko', label: '한국어', detail: 'Korean' },
+  { value: 'vi', label: 'Tiếng Việt', detail: 'Vietnamese' },
+  { value: 'id', label: 'Bahasa Indonesia', detail: 'Indonesian' },
+  { value: 'ms', label: 'Bahasa Melayu', detail: 'Malay' },
+  { value: 'th', label: 'ไทย', detail: 'Thai' },
+  { value: 'es', label: 'Español', detail: 'Spanish' },
+  { value: 'pt', label: 'Português', detail: 'Portuguese' },
+  { value: 'fr', label: 'Français', detail: 'French' },
+  { value: 'de', label: 'Deutsch', detail: 'German' },
+  { value: 'it', label: 'Italiano', detail: 'Italian' },
+  { value: 'nl', label: 'Nederlands', detail: 'Dutch' },
+  { value: 'ru', label: 'Русский', detail: 'Russian' },
+  { value: 'ar', label: 'العربية', detail: 'Arabic' },
+  { value: 'hi', label: 'हिन्दी', detail: 'Hindi' },
+  { value: 'tr', label: 'Türkçe', detail: 'Turkish' },
+  { value: 'tl', label: 'Filipino', detail: 'Filipino' },
+]
 
 interface MediaEditorState {
   kind: MediaKind
@@ -120,6 +170,7 @@ function SignedInProfile({
   onLogout: () => void
   styles: ReturnType<typeof createStyles>
 }) {
+  const { text } = useI18n()
   const avatar = user.avatar ?? user.avatarUrl
   const location = [user.region, user.country].filter(Boolean).join(' · ')
   const level = user.level ?? 1
@@ -165,12 +216,12 @@ function SignedInProfile({
       const response = await getMyBadgesApi(token)
       setAvailableBadgeIds(response.badges.map((badge) => badge.id))
     } catch {
-      setBadgeError('徽章列表加载失败，请稍后再试。')
+      setBadgeError(text('徽章列表加载失败，请稍后再试。'))
       setAvailableBadgeIds(null)
     } finally {
       setLoadingBadges(false)
     }
-  }, [token])
+  }, [text, token])
 
   useEffect(() => {
     if (!autoOpenBadges) return
@@ -186,11 +237,11 @@ function SignedInProfile({
       await onUpdated()
       setBadgeSheetVisible(false)
     } catch {
-      setBadgeError('徽章保存失败，请稍后再试。')
+      setBadgeError(text('徽章保存失败，请稍后再试。'))
     } finally {
       setSavingBadgeId(null)
     }
-  }, [onUpdated, token])
+  }, [onUpdated, text, token])
 
   const persistSettings = useCallback(async (next: LocalProfileSettings) => {
     setSettings(next)
@@ -206,16 +257,16 @@ function SignedInProfile({
       await onUpdated()
       setMediaEditor(null)
     } catch {
-      Alert.alert(kind === 'avatar' ? '头像保存失败' : '背景保存失败', '请稍后再试。')
+      Alert.alert(kind === 'avatar' ? text('头像保存失败') : text('背景保存失败'), text('请稍后再试。'))
     } finally {
       setSavingMedia(null)
     }
-  }, [onUpdated, token])
+  }, [onUpdated, text, token])
 
   const pickFromCamera = useCallback(async (kind: MediaKind) => {
     const permission = await ImagePicker.requestCameraPermissionsAsync()
     if (!permission.granted) {
-      Alert.alert('无法使用相机', '请在系统设置中允许 LazyNavy 使用相机。')
+      Alert.alert(text('无法使用相机'), text('请在系统设置中允许 LazyNavy 使用相机。'))
       return
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -228,7 +279,7 @@ function SignedInProfile({
     const asset = result.assets[0]
     if (!asset?.uri) return
     setMediaEditor({ kind, uri: asset.uri, width: asset.width, height: asset.height })
-  }, [])
+  }, [text])
 
   const pickProfileImage = useCallback(async (kind: MediaKind) => {
     if (!token) return
@@ -242,13 +293,13 @@ function SignedInProfile({
       setLibraryPickerKind(null)
       setMediaEditor({ kind, uri, width: asset.width, height: asset.height })
     } catch {
-      Alert.alert('读取图片失败', '请换一张图片再试。')
+      Alert.alert(text('读取图片失败'), text('请换一张图片再试。'))
     }
-  }, [])
+  }, [text])
 
   return (
     <>
-      <Pressable style={styles.hero} onPress={() => void pickProfileImage('cover')} accessibilityRole="button" accessibilityLabel="上传背景">
+      <Pressable style={styles.hero} onPress={() => void pickProfileImage('cover')} accessibilityRole="button" accessibilityLabel={text('上传背景')}>
         {user.coverImage ? (
           <Image source={{ uri: user.coverImage }} style={styles.coverImage} resizeMode="cover" />
         ) : (
@@ -268,7 +319,7 @@ function SignedInProfile({
               void pickProfileImage('avatar')
             }}
             accessibilityRole="button"
-            accessibilityLabel="上传头像"
+            accessibilityLabel={text('上传头像')}
           >
             {avatar ? (
               <Image source={{ uri: avatar }} style={styles.avatarImage} resizeMode="cover" />
@@ -286,47 +337,47 @@ function SignedInProfile({
               <Text numberOfLines={1} style={styles.name}>{user.nickname}</Text>
               {activeBadge && <Image source={activeBadge.image} style={styles.heroBadge} resizeMode="contain" />}
             </View>
-            <Text numberOfLines={1} style={styles.meta}>{location || '地区未设置'}</Text>
+            <Text numberOfLines={1} style={styles.meta}>{location || text('地区未设置')}</Text>
             <View style={styles.factRow}>
               <Text style={[styles.gender, { color: genderColor(user.gender) }]}>{genderIcon(user.gender)}</Text>
-              <Text style={styles.fact}>{ageText(user.birthDate)}</Text>
+              <Text style={styles.fact}>{ageText(user.birthDate, text)}</Text>
             </View>
           </View>
         </View>
       </Pressable>
 
       <View style={styles.body}>
-        <Text style={styles.bio}>{user.bio?.trim() || '还没有填写个人简介。'}</Text>
+        <Text style={styles.bio}>{user.bio?.trim() || text('还没有填写个人简介。')}</Text>
 
         <View style={styles.statsRow}>
-          <Stat label="等级" value={`Lv.${level}`} styles={styles} />
+          <Stat label={text('等级')} value={`Lv.${level}`} styles={styles} />
           <View style={styles.statDivider} />
-          <Stat label="经验" value={xp.toLocaleString()} styles={styles} />
+          <Stat label={text('经验')} value={xp.toLocaleString()} styles={styles} />
           <View style={styles.statDivider} />
-          <Stat label="里程点" value={mileage.toLocaleString()} styles={styles} />
+          <Stat label={text('里程点')} value={mileage.toLocaleString()} styles={styles} />
         </View>
 
         <View style={styles.infoPanel}>
           <MenuRow
-            label="我的资料"
-            value="基本信息"
+            label={text('我的资料')}
+            value={text('基本信息')}
             styles={styles}
             onPress={() => setPanel('profile')}
           />
           <MenuRow
-            label="我的徽章"
-            value={activeBadge?.title ?? '未佩戴'}
+            label={text('我的徽章')}
+            value={activeBadge?.title ?? text('未佩戴')}
             accent={!!activeBadge}
             styles={styles}
             onPress={openBadgeSheet}
           />
-          <MenuRow label="安全" value={securitySummary(settings)} styles={styles} onPress={() => setPanel('security')} />
-          <MenuRow label="界面设置" value={appearanceSummary(settings, user)} styles={styles} onPress={() => setPanel('appearance')} />
-          <MenuRow label="隐私设置" value={privacySummary(settings, user)} styles={styles} onPress={() => setPanel('privacy')} />
+          <MenuRow label={text('安全')} value={securitySummary(settings, text)} styles={styles} onPress={() => setPanel('security')} />
+          <MenuRow label={text('界面设置')} value={appearanceSummary(settings, user, text)} styles={styles} onPress={() => setPanel('appearance')} />
+          <MenuRow label={text('隐私设置')} value={privacySummary(settings, user, text)} styles={styles} onPress={() => setPanel('privacy')} />
         </View>
 
         <Pressable style={styles.logoutButton} onPress={onLogout}>
-          <Text style={styles.logoutText}>退出登录</Text>
+          <Text style={styles.logoutText}>{text('退出登录')}</Text>
         </Pressable>
         <Text style={styles.versionText}>LazyNavy V{Constants.expoConfig?.version ?? '0.0.1'}</Text>
       </View>
@@ -368,7 +419,7 @@ function SignedInProfile({
       />
       <ImageSourceActionSheet
         visible={mediaActionKind !== null}
-        title={mediaActionKind === 'avatar' ? '更换头像' : '更换背景'}
+        title={mediaActionKind === 'avatar' ? text('更换头像') : text('更换背景')}
         onClose={() => setMediaActionKind(null)}
         onCamera={() => {
           if (mediaActionKind) void pickFromCamera(mediaActionKind)
@@ -382,15 +433,16 @@ function SignedInProfile({
 }
 
 function GuestProfile({ onLogin, styles }: { onLogin: () => void; styles: ReturnType<typeof createStyles> }) {
+  const { text } = useI18n()
   return (
     <View style={styles.guestCard}>
       <View style={styles.guestAvatar}>
         <Text style={styles.guestAvatarText}>◎</Text>
       </View>
-      <Text style={styles.guestTitle}>登录后查看我的资料</Text>
-      <Text style={styles.guestSubtitle}>同步你的头像、昵称和账号信息，之后这里会承接 v2 的个人资料展示。</Text>
+      <Text style={styles.guestTitle}>{text('登录后查看我的资料')}</Text>
+      <Text style={styles.guestSubtitle}>{text('同步你的头像、昵称和账号信息，之后这里会承接 v2 的个人资料展示。')}</Text>
       <Pressable style={styles.loginButton} onPress={onLogin}>
-        <Text style={styles.loginButtonText}>登录 / 注册</Text>
+        <Text style={styles.loginButtonText}>{text('登录 / 注册')}</Text>
       </Pressable>
     </View>
   )
@@ -440,6 +492,7 @@ function PhotoLibrarySheet({
   onClose: () => void
   onSelect: (asset: MediaLibrary.Asset, kind: MediaKind) => void
 }) {
+  const { text } = useI18n()
   const [assets, setAssets] = useState<MediaLibrary.Asset[]>([])
   const [loading, setLoading] = useState(false)
   const [access, setAccess] = useState<'all' | 'limited' | 'none'>('none')
@@ -464,11 +517,11 @@ function PhotoLibrarySheet({
       setAssets(page.assets)
     } catch {
       setAssets([])
-      Alert.alert('相册加载失败', '请稍后再试。')
+      Alert.alert(text('相册加载失败'), text('请稍后再试。'))
     } finally {
       if (showLoading) setLoading(false)
     }
-  }, [kind, onClose])
+  }, [kind, onClose, text])
 
   useEffect(() => {
     if (!kind) return
@@ -490,7 +543,7 @@ function PhotoLibrarySheet({
       await MediaLibrary.presentPermissionsPickerAsync(['photo'])
       await refreshAfterPermissionChange(loadAssets)
     } catch {
-      Alert.alert('无法打开照片权限选择', '请在系统设置中调整 LazyNavy 的照片访问权限。')
+      Alert.alert(text('无法打开照片权限选择'), text('请在系统设置中调整 LazyNavy 的照片访问权限。'))
     }
   }
 
@@ -501,9 +554,9 @@ function PhotoLibrarySheet({
       <View style={styles.photoPickerScreen}>
         <View style={styles.photoPickerHeader}>
           <Pressable style={styles.photoPickerHeaderButton} onPress={onClose}>
-            <Text style={styles.photoPickerHeaderText}>取消</Text>
+            <Text style={styles.photoPickerHeaderText}>{text('取消')}</Text>
           </Pressable>
-          <Text style={styles.photoPickerTitle}>选择照片</Text>
+          <Text style={styles.photoPickerTitle}>{text('选择照片')}</Text>
           <View style={styles.photoPickerHeaderButton} />
         </View>
         {loading ? (
@@ -512,10 +565,10 @@ function PhotoLibrarySheet({
           </View>
         ) : access === 'none' ? (
           <View style={styles.photoPermissionEmpty}>
-            <Text style={styles.photoPermissionTitle}>无法访问相册中的照片</Text>
-            <Text style={styles.photoPermissionText}>请在系统设置中允许 LazyNavy 访问照片，或选择有限照片访问。</Text>
+            <Text style={styles.photoPermissionTitle}>{text('无法访问相册中的照片')}</Text>
+            <Text style={styles.photoPermissionText}>{text('请在系统设置中允许 LazyNavy 访问照片，或选择有限照片访问。')}</Text>
             <Pressable style={styles.photoPermissionButton} onPress={() => void Linking.openSettings()}>
-              <Text style={styles.photoPermissionButtonText}>去设置</Text>
+              <Text style={styles.photoPermissionButtonText}>{text('去设置')}</Text>
             </Pressable>
           </View>
         ) : (
@@ -524,13 +577,13 @@ function PhotoLibrarySheet({
             keyExtractor={(item) => item === 'add-more' ? 'add-more' : item.id}
             numColumns={3}
             contentContainerStyle={styles.photoGrid}
-            ListEmptyComponent={<Text style={styles.photoEmptyText}>没有可访问的照片</Text>}
+            ListEmptyComponent={<Text style={styles.photoEmptyText}>{text('没有可访问的照片')}</Text>}
             renderItem={({ item }) => (
               item === 'add-more' ? (
                 <Pressable style={[styles.photoTile, styles.photoMoreTile]} onPress={() => void chooseMore()}>
                   <Text style={styles.photoMorePlus}>＋</Text>
-                  <Text style={styles.photoMoreTileText}>添加更多</Text>
-                  <Text style={styles.photoMoreTileText}>可访问照片</Text>
+                  <Text style={styles.photoMoreTileText}>{text('添加更多')}</Text>
+                  <Text style={styles.photoMoreTileText}>{text('可访问照片')}</Text>
                 </Pressable>
               ) : (
                 <Pressable style={styles.photoTile} onPress={() => onSelect(item, kind)}>
@@ -558,6 +611,7 @@ function MediaCropSheet({
   onClose: () => void
   onSave: (uri: string, kind: MediaKind) => void
 }) {
+  const { text } = useI18n()
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 })
   const [zoom, setZoom] = useState(1)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
@@ -650,7 +704,7 @@ function MediaCropSheet({
       )
       onSave(result.uri, media.kind)
     } catch {
-      Alert.alert('裁剪失败', '请换一张图片再试。')
+      Alert.alert(text('裁剪失败'), text('请换一张图片再试。'))
     }
   }
 
@@ -659,11 +713,11 @@ function MediaCropSheet({
       <View style={styles.cropFullscreen}>
         <View style={styles.cropTopBar}>
           <Pressable style={styles.cropTopButton} onPress={onClose}>
-            <Text style={styles.cropTopButtonText}>取消</Text>
+            <Text style={styles.cropTopButtonText}>{text('取消')}</Text>
           </Pressable>
-          <Text style={styles.cropTopTitle}>{media.kind === 'avatar' ? '调整头像' : '调整背景'}</Text>
+          <Text style={styles.cropTopTitle}>{media.kind === 'avatar' ? text('调整头像') : text('调整背景')}</Text>
           <Pressable style={styles.cropTopButton} onPress={() => void saveCrop()} disabled={saving}>
-            <Text style={styles.cropTopButtonText}>{saving ? '保存中' : '保存'}</Text>
+            <Text style={styles.cropTopButtonText}>{saving ? text('保存中') : text('保存')}</Text>
           </Pressable>
         </View>
 
@@ -693,7 +747,7 @@ function MediaCropSheet({
               resizeMode="cover"
             />
           </View>
-          <Text style={styles.cropHint}>双指缩放，拖动调整位置</Text>
+          <Text style={styles.cropHint}>{text('双指缩放，拖动调整位置')}</Text>
         </View>
       </View>
     </Modal>
@@ -723,11 +777,13 @@ function SettingsSheet({
   onUpdated: () => Promise<void>
   onSaveSettings: (settings: LocalProfileSettings) => Promise<void>
 }) {
+  const { setLocale, text } = useI18n()
   const [draft, setDraft] = useState<Partial<AuthUser>>({})
   const [localDraft, setLocalDraft] = useState<LocalProfileSettings>(settings)
   const [disableProtectionPassword, setDisableProtectionPassword] = useState('')
   const [birthPickerVisible, setBirthPickerVisible] = useState(false)
   const [countryPickerVisible, setCountryPickerVisible] = useState(false)
+  const [languagePicker, setLanguagePicker] = useState<LanguagePickerKind | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -746,17 +802,21 @@ function SettingsSheet({
       isPublic: user.isPublic ?? true,
       locationPolicy: user.locationPolicy ?? 'region',
     })
-    setLocalDraft(settings)
+    setLocalDraft({
+      ...settings,
+      speechLanguage: user.textLanguage ?? settings.speechLanguage,
+      uiLanguage: user.uiLanguage ?? settings.uiLanguage,
+    })
     setDisableProtectionPassword('')
   }, [settings, user, visible])
 
   if (!panel) return null
 
   const title = {
-    profile: '我的资料',
-    security: '安全',
-    appearance: '界面设置',
-    privacy: '隐私设置',
+    profile: text('我的资料'),
+    security: text('安全'),
+    appearance: text('界面设置'),
+    privacy: text('隐私设置'),
   }[panel]
   const hasFace = biometricTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)
   const hasFingerprint = biometricTypes.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)
@@ -784,6 +844,7 @@ function SettingsSheet({
           uiLanguage: localDraft.uiLanguage,
           textLanguage: localDraft.speechLanguage,
         })
+        setLocale(localDraft.uiLanguage)
         await onUpdated()
       }
       if (panel === 'privacy') {
@@ -796,11 +857,11 @@ function SettingsSheet({
       }
       if (panel === 'security') {
         if (localDraft.appLockEnabled && localDraft.appLockPassword.trim().length === 0) {
-          Alert.alert('需要保护密码', '开启保护时请先设置保护密码。')
+          Alert.alert(text('需要保护密码'), text('开启保护时请先设置保护密码。'))
           return
         }
         if (settings.appLockEnabled && !localDraft.appLockEnabled && disableProtectionPassword !== settings.appLockPassword) {
-          Alert.alert('密码不正确', '解除保护需要输入当前保护密码。')
+          Alert.alert(text('密码不正确'), text('解除保护需要输入当前保护密码。'))
           return
         }
         await onSaveSettings({
@@ -812,7 +873,7 @@ function SettingsSheet({
       }
       onClose()
     } catch {
-      Alert.alert('保存失败', '请检查填写内容后再试。')
+      Alert.alert(text('保存失败'), text('请检查填写内容后再试。'))
     } finally {
       setSaving(false)
     }
@@ -823,18 +884,18 @@ function SettingsSheet({
       <View style={styles.settingsScreen}>
         <View style={styles.settingsNav}>
           <Pressable style={styles.settingsNavButton} onPress={onClose}>
-            <Text style={styles.settingsNavButtonText}>取消</Text>
+            <Text style={styles.settingsNavButtonText}>{text('取消')}</Text>
           </Pressable>
           <Text style={styles.settingsNavTitle}>{title}</Text>
           <Pressable style={styles.settingsNavButton} onPress={() => void save()} disabled={saving}>
-            <Text style={[styles.settingsNavButtonText, saving && styles.settingsNavButtonDisabled]}>{saving ? '保存中' : '完成'}</Text>
+            <Text style={[styles.settingsNavButtonText, saving && styles.settingsNavButtonDisabled]}>{saving ? text('保存中') : text('完成')}</Text>
           </Pressable>
         </View>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.settingsContent}>
           {panel === 'profile' && (
             <>
               <SettingsGroup styles={styles}>
-                <Field label="昵称" value={String(draft.nickname ?? '')} styles={styles} onChangeText={(nickname) => setDraft((d) => ({ ...d, nickname }))} />
+                <Field label={text('昵称')} value={String(draft.nickname ?? '')} styles={styles} onChangeText={(nickname) => setDraft((d) => ({ ...d, nickname }))} />
                 <BirthdayField value={String(draft.birthDate ?? '')} styles={styles} onPress={() => setBirthPickerVisible(true)} />
                 <CountryRegionField
                   country={String(draft.country ?? '')}
@@ -844,58 +905,70 @@ function SettingsSheet({
                 />
               </SettingsGroup>
               <SettingsGroup styles={styles}>
-                <Segment label="性别" value={String(draft.gender ?? 'private')} options={[['private', '保密'], ['male', '男'], ['female', '女']]} styles={styles} onChange={(gender) => setDraft((d) => ({ ...d, gender }))} />
+                <Segment label={text('性别')} value={String(draft.gender ?? 'private')} options={[['private', text('保密')], ['male', text('男')], ['female', text('女')]]} styles={styles} onChange={(gender) => setDraft((d) => ({ ...d, gender }))} />
               </SettingsGroup>
               <SettingsGroup styles={styles}>
-                <Field label="个人简介" value={String(draft.bio ?? '')} multiline styles={styles} onChangeText={(bio) => setDraft((d) => ({ ...d, bio }))} />
+                <Field label={text('个人简介')} value={String(draft.bio ?? '')} multiline styles={styles} onChangeText={(bio) => setDraft((d) => ({ ...d, bio }))} />
               </SettingsGroup>
             </>
           )}
           {panel === 'security' && (
             <>
               <SettingsGroup styles={styles}>
-                <Segment label="2FA" value={localDraft.twoFactorMethod} options={[['off', '关闭'], ['email', '邮箱'], ['authenticator', '验证器']]} styles={styles} onChange={(twoFactorMethod) => setLocalDraft((d) => ({ ...d, twoFactorMethod: twoFactorMethod as LocalProfileSettings['twoFactorMethod'] }))} />
+                <Segment label="2FA" value={localDraft.twoFactorMethod} options={[['off', text('关闭 2FA')], ['email', text('邮箱')], ['authenticator', text('验证器')]]} styles={styles} onChange={(twoFactorMethod) => setLocalDraft((d) => ({ ...d, twoFactorMethod: twoFactorMethod as LocalProfileSettings['twoFactorMethod'] }))} />
               </SettingsGroup>
               <SettingsGroup styles={styles}>
-                <SettingToggle label="后台打开需要保护密码" value={localDraft.appLockEnabled} styles={styles} onValueChange={(appLockEnabled) => setLocalDraft((d) => ({ ...d, appLockEnabled }))} />
+                <SettingToggle label={text('后台打开需要保护密码')} value={localDraft.appLockEnabled} styles={styles} onValueChange={(appLockEnabled) => setLocalDraft((d) => ({ ...d, appLockEnabled }))} />
                 {localDraft.appLockEnabled ? (
-                  <Field label="保护密码" value={localDraft.appLockPassword} secureTextEntry styles={styles} onChangeText={(appLockPassword) => setLocalDraft((d) => ({ ...d, appLockPassword }))} />
+                  <Field label={text('保护密码')} value={localDraft.appLockPassword} secureTextEntry styles={styles} onChangeText={(appLockPassword) => setLocalDraft((d) => ({ ...d, appLockPassword }))} />
                 ) : settings.appLockEnabled ? (
-                  <Field label="当前保护密码" value={disableProtectionPassword} secureTextEntry styles={styles} onChangeText={setDisableProtectionPassword} />
+                  <Field label={text('当前保护密码')} value={disableProtectionPassword} secureTextEntry styles={styles} onChangeText={setDisableProtectionPassword} />
                 ) : null}
-                <SettingToggle label="面部解锁" value={localDraft.appLockEnabled && localDraft.faceUnlockEnabled && hasFace} disabled={!localDraft.appLockEnabled || !hasFace} styles={styles} onValueChange={(faceUnlockEnabled) => setLocalDraft((d) => ({ ...d, faceUnlockEnabled }))} />
-                <SettingToggle label="指纹解锁" value={localDraft.appLockEnabled && localDraft.fingerprintUnlockEnabled && hasFingerprint} disabled={!localDraft.appLockEnabled || !hasFingerprint} styles={styles} onValueChange={(fingerprintUnlockEnabled) => setLocalDraft((d) => ({ ...d, fingerprintUnlockEnabled }))} />
+                <SettingToggle label={text('面部解锁')} value={localDraft.appLockEnabled && localDraft.faceUnlockEnabled && hasFace} disabled={!localDraft.appLockEnabled || !hasFace} styles={styles} onValueChange={(faceUnlockEnabled) => setLocalDraft((d) => ({ ...d, faceUnlockEnabled }))} />
+                <SettingToggle label={text('指纹解锁')} value={localDraft.appLockEnabled && localDraft.fingerprintUnlockEnabled && hasFingerprint} disabled={!localDraft.appLockEnabled || !hasFingerprint} styles={styles} onValueChange={(fingerprintUnlockEnabled) => setLocalDraft((d) => ({ ...d, fingerprintUnlockEnabled }))} />
               </SettingsGroup>
-              <InfoNote text="修改密码入口已预留，后端密码修改接口接入后会从这里进入。" styles={styles} />
+              <InfoNote text={text('修改密码入口已预留，后端密码修改接口接入后会从这里进入。')} styles={styles} />
             </>
           )}
           {panel === 'appearance' && (
             <>
               <SettingsGroup styles={styles}>
-                <Segment label="颜色主题" value={localDraft.colorTheme} options={[['ocean', '海洋'], ['light', '浅色'], ['dark', '深色'], ['system', '跟随系统']]} styles={styles} onChange={(colorTheme) => setLocalDraft((d) => ({ ...d, colorTheme: colorTheme as LocalProfileSettings['colorTheme'] }))} />
+                <Segment label={text('颜色主题')} value={localDraft.colorTheme} options={[['ocean', text('海洋')], ['light', text('浅色')], ['dark', text('深色')], ['system', text('跟随系统')]]} styles={styles} onChange={(colorTheme) => setLocalDraft((d) => ({ ...d, colorTheme: colorTheme as LocalProfileSettings['colorTheme'] }))} />
               </SettingsGroup>
               <SettingsGroup styles={styles}>
-                <Field label="说话语言" value={localDraft.speechLanguage} styles={styles} onChangeText={(speechLanguage) => setLocalDraft((d) => ({ ...d, speechLanguage }))} />
-                <Field label="界面语言" value={localDraft.uiLanguage} styles={styles} onChangeText={(uiLanguage) => setLocalDraft((d) => ({ ...d, uiLanguage }))} />
+                <LanguageField
+                  label={text('说话语言')}
+                  value={languageLabel(SPEECH_LANGUAGE_OPTIONS, localDraft.speechLanguage)}
+                  placeholder={text('选择说话语言')}
+                  styles={styles}
+                  onPress={() => setLanguagePicker('speech')}
+                />
+                <LanguageField
+                  label={text('界面语言')}
+                  value={languageLabel(UI_LANGUAGE_OPTIONS, localDraft.uiLanguage)}
+                  placeholder={text('选择界面语言')}
+                  styles={styles}
+                  onPress={() => setLanguagePicker('ui')}
+                />
               </SettingsGroup>
             </>
           )}
           {panel === 'privacy' && (
             <>
               <SettingsGroup styles={styles}>
-                <Segment label="谁能看我" value={localDraft.whoCanViewMe} options={[['everyone', '所有人'], ['friends', '好友'], ['crew', '船员'], ['private', '仅自己']]} styles={styles} onChange={(whoCanViewMe) => setLocalDraft((d) => ({ ...d, whoCanViewMe: whoCanViewMe as LocalProfileSettings['whoCanViewMe'] }))} />
-                <Segment label="谁能加我" value={localDraft.whoCanAddMe} options={[['everyone', '所有人'], ['friends', '好友'], ['crew', '船员'], ['private', '关闭']]} styles={styles} onChange={(whoCanAddMe) => setLocalDraft((d) => ({ ...d, whoCanAddMe: whoCanAddMe as LocalProfileSettings['whoCanAddMe'] }))} />
+                <Segment label={text('谁能看我')} value={localDraft.whoCanViewMe} options={[['everyone', text('所有人')], ['friends', text('好友')], ['crew', text('船员')], ['private', text('仅自己')]]} styles={styles} onChange={(whoCanViewMe) => setLocalDraft((d) => ({ ...d, whoCanViewMe: whoCanViewMe as LocalProfileSettings['whoCanViewMe'] }))} />
+                <Segment label={text('谁能加我')} value={localDraft.whoCanAddMe} options={[['everyone', text('所有人')], ['friends', text('好友')], ['crew', text('船员')], ['private', text('关闭')]]} styles={styles} onChange={(whoCanAddMe) => setLocalDraft((d) => ({ ...d, whoCanAddMe: whoCanAddMe as LocalProfileSettings['whoCanAddMe'] }))} />
               </SettingsGroup>
               <SettingsGroup styles={styles}>
-                <SettingToggle label="允许被搜索到" value={localDraft.searchable} styles={styles} onValueChange={(searchable) => setLocalDraft((d) => ({ ...d, searchable }))} />
-                <SettingToggle label="公开资料页" value={!!draft.isPublic} styles={styles} onValueChange={(isPublic) => setDraft((d) => ({ ...d, isPublic }))} />
-                <Segment label="位置展示" value={String(draft.locationPolicy ?? 'region')} options={[['exact', '精确'], ['region', '地区'], ['hidden', '隐藏']]} styles={styles} onChange={(locationPolicy) => setDraft((d) => ({ ...d, locationPolicy }))} />
+                <SettingToggle label={text('允许被搜索到')} value={localDraft.searchable} styles={styles} onValueChange={(searchable) => setLocalDraft((d) => ({ ...d, searchable }))} />
+                <SettingToggle label={text('公开资料页')} value={!!draft.isPublic} styles={styles} onValueChange={(isPublic) => setDraft((d) => ({ ...d, isPublic }))} />
+                <Segment label={text('位置展示')} value={String(draft.locationPolicy ?? 'region')} options={[['exact', text('精确')], ['region', text('地区')], ['hidden', text('隐藏')]]} styles={styles} onChange={(locationPolicy) => setDraft((d) => ({ ...d, locationPolicy }))} />
               </SettingsGroup>
               <SettingsGroup styles={styles}>
                 {(['avatar', 'bio', 'region', 'badges'] as const).map((field) => (
                   <SettingToggle
                     key={field}
-                    label={visibleFieldLabel(field)}
+                    label={visibleFieldLabel(field, text)}
                     value={localDraft.visibleFields.includes(field)}
                     styles={styles}
                     onValueChange={(enabled) => setLocalDraft((d) => ({ ...d, visibleFields: toggleItem(d.visibleFields, field, enabled) }))}
@@ -923,6 +996,25 @@ function SettingsSheet({
               onChange={({ country, region }) => setDraft((d) => ({ ...d, country, region }))}
             />
           </>
+        )}
+        {panel === 'appearance' && (
+          <LanguagePicker
+            kind={languagePicker}
+            speechValue={localDraft.speechLanguage}
+            uiValue={localDraft.uiLanguage}
+            title={languagePicker === 'speech' ? text('选择说话语言') : text('选择界面语言')}
+            cancelLabel={text('取消')}
+            styles={styles}
+            onClose={() => setLanguagePicker(null)}
+            onSelect={(value) => {
+              if (languagePicker === 'speech') {
+                setLocalDraft((d) => ({ ...d, speechLanguage: value }))
+              } else {
+                setLocalDraft((d) => ({ ...d, uiLanguage: value }))
+              }
+              setLanguagePicker(null)
+            }}
+          />
         )}
       </View>
     </Modal>
@@ -966,12 +1058,13 @@ function BirthdayField({ value, styles, onPress }: {
   styles: ReturnType<typeof createStyles>
   onPress: () => void
 }) {
+  const { text } = useI18n()
   const displayValue = formatBirthDateDisplay(value)
   const privateDate = isPrivateBirthDate(value)
   return (
     <Pressable style={styles.fieldWrap} onPress={onPress}>
-      <Text style={styles.fieldLabel}>生日</Text>
-      <Text style={[styles.dateValue, !displayValue && !privateDate && styles.datePlaceholder]}>{privateDate ? '保密' : displayValue || '选择日期'}</Text>
+      <Text style={styles.fieldLabel}>{text('生日')}</Text>
+      <Text style={[styles.dateValue, !displayValue && !privateDate && styles.datePlaceholder]}>{privateDate ? text('保密') : displayValue || text('选择日期')}</Text>
       <Text style={styles.settingsChevron}>›</Text>
     </Pressable>
   )
@@ -983,13 +1076,90 @@ function CountryRegionField({ country, region, styles, onPress }: {
   styles: ReturnType<typeof createStyles>
   onPress: () => void
 }) {
+  const { text } = useI18n()
   const value = [country, region].filter(Boolean).join(' · ')
   return (
     <Pressable style={styles.fieldWrap} onPress={onPress}>
-      <Text style={styles.fieldLabel}>国家和地区</Text>
-      <Text style={[styles.dateValue, !value && styles.datePlaceholder]}>{value || '选择国家和地区'}</Text>
+      <Text style={styles.fieldLabel}>{text('国家和地区')}</Text>
+      <Text style={[styles.dateValue, !value && styles.datePlaceholder]}>{value || text('选择国家和地区')}</Text>
       <Text style={styles.settingsChevron}>›</Text>
     </Pressable>
+  )
+}
+
+function LanguageField({ label, value, placeholder, styles, onPress }: {
+  label: string
+  value: string
+  placeholder: string
+  styles: ReturnType<typeof createStyles>
+  onPress: () => void
+}) {
+  const { text } = useI18n()
+  return (
+    <Pressable style={styles.fieldWrap} onPress={onPress}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <Text style={[styles.dateValue, !value && styles.datePlaceholder]}>{value || placeholder}</Text>
+      <Text style={styles.settingsChevron}>›</Text>
+    </Pressable>
+  )
+}
+
+function LanguagePicker({
+  kind,
+  speechValue,
+  uiValue,
+  title,
+  cancelLabel,
+  styles,
+  onClose,
+  onSelect,
+}: {
+  kind: LanguagePickerKind | null
+  speechValue: string
+  uiValue: string
+  title: string
+  cancelLabel: string
+  styles: ReturnType<typeof createStyles>
+  onClose: () => void
+  onSelect: (value: string) => void
+}) {
+  if (!kind) return null
+
+  const options = kind === 'speech' ? SPEECH_LANGUAGE_OPTIONS : UI_LANGUAGE_OPTIONS
+  const selectedValue = kind === 'speech' ? speechValue : uiValue
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.datePickerLayer}>
+        <Pressable style={styles.datePickerBackdrop} onPress={onClose} />
+        <View style={styles.languagePickerSheet}>
+          <View style={styles.datePickerToolbar}>
+            <Pressable style={styles.datePickerToolbarButton} onPress={onClose}>
+              <Text style={styles.datePickerClearText}>{cancelLabel}</Text>
+            </Pressable>
+            <Text style={styles.datePickerTitle}>{title}</Text>
+            <View style={styles.datePickerToolbarButton} />
+          </View>
+          <FlatList
+            data={options}
+            keyExtractor={(item) => item.value}
+            contentContainerStyle={styles.languageOptionList}
+            renderItem={({ item }) => {
+              const selected = item.value === selectedValue
+              return (
+                <Pressable style={styles.languageOption} onPress={() => onSelect(item.value)}>
+                  <View style={styles.languageOptionTextWrap}>
+                    <Text style={styles.languageOptionLabel}>{item.label}</Text>
+                    <Text style={styles.languageOptionDetail}>{item.detail}</Text>
+                  </View>
+                  <Text style={[styles.languageOptionCheck, selected && styles.languageOptionCheckActive]}>{selected ? '✓' : ''}</Text>
+                </Pressable>
+              )
+            }}
+          />
+        </View>
+      </View>
+    </Modal>
   )
 }
 
@@ -1001,6 +1171,7 @@ function BirthDatePicker({ visible, value, styles, onClose, onPrivate, onChange 
   onPrivate: () => void
   onChange: (value: string) => void
 }) {
+  const { locale, text } = useI18n()
   const [selectedDate, setSelectedDate] = useState(dateFromBirthValue(value))
 
   useEffect(() => {
@@ -1025,18 +1196,18 @@ function BirthDatePicker({ visible, value, styles, onClose, onPrivate, onChange 
         <View style={styles.datePickerSheet}>
           <View style={styles.datePickerToolbar}>
             <Pressable style={styles.datePickerToolbarButton} onPress={setPrivate}>
-              <Text style={styles.datePickerClearText}>保密</Text>
+              <Text style={styles.datePickerClearText}>{text('保密')}</Text>
             </Pressable>
-            <Text style={styles.datePickerTitle}>选择生日</Text>
+            <Text style={styles.datePickerTitle}>{text('选择生日')}</Text>
             <Pressable style={styles.datePickerToolbarButton} onPress={confirm}>
-              <Text style={styles.datePickerDoneText}>完成</Text>
+              <Text style={styles.datePickerDoneText}>{text('完成')}</Text>
             </Pressable>
           </View>
           <DateTimePicker
             value={selectedDate}
             mode="date"
             display="spinner"
-            locale="zh-Hans"
+            locale={locale === 'zh-CN' ? 'zh-Hans' : locale}
             maximumDate={new Date()}
             minimumDate={new Date(1900, 0, 1)}
             onChange={(_, date) => {
@@ -1081,9 +1252,10 @@ function SettingToggle({ label, value, disabled, styles, onValueChange }: {
   styles: ReturnType<typeof createStyles>
   onValueChange: (value: boolean) => void
 }) {
+  const { text } = useI18n()
   return (
     <View style={[styles.toggleRow, disabled && styles.toggleRowDisabled]}>
-      <Text style={styles.toggleLabel}>{label}{disabled ? '（不支持）' : ''}</Text>
+      <Text style={styles.toggleLabel}>{label}{disabled ? text('（不支持）') : ''}</Text>
       <Switch value={value} disabled={disabled} onValueChange={onValueChange} />
     </View>
   )
@@ -1114,6 +1286,7 @@ function BadgeSheet({
   onClose: () => void
   onSelect: (badgeId: string | null) => Promise<void>
 }) {
+  const { text } = useI18n()
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.badgeModalLayer}>
@@ -1122,15 +1295,15 @@ function BadgeSheet({
           <View style={styles.sheetHandle} />
           <View style={styles.badgeSheetHeader}>
             <View>
-              <Text style={styles.badgeSheetTitle}>我的徽章</Text>
-              <Text style={styles.badgeSheetSubtitle}>选择一个已启用徽章展示在资料和需要露出的地方。</Text>
+              <Text style={styles.badgeSheetTitle}>{text('我的徽章')}</Text>
+              <Text style={styles.badgeSheetSubtitle}>{text('选择一个已启用徽章展示在资料和需要露出的地方。')}</Text>
             </View>
             <Pressable style={styles.sheetClose} onPress={onClose}><Text style={styles.sheetCloseText}>×</Text></Pressable>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.badgeList}>
-            <BadgeCategory title="系统成就徽章" caption="当前开放" />
-            {loading && <Text style={styles.badgeLoading}>正在同步徽章列表...</Text>}
+            <BadgeCategory title={text('系统成就徽章')} caption={text('当前开放')} />
+            {loading && <Text style={styles.badgeLoading}>{text('正在同步徽章列表...')}</Text>}
             <View style={styles.badgeGrid}>
               {SYSTEM_BADGE_CATALOG.filter((badge) => !availableBadgeIds || availableBadgeIds.includes(badge.id)).map((badge) => (
                 <BadgeOption
@@ -1145,14 +1318,14 @@ function BadgeSheet({
             </View>
 
             <Pressable style={styles.clearBadgeButton} onPress={() => void onSelect(null)} disabled={savingBadgeId === 'none'}>
-              <Text style={styles.clearBadgeText}>{savingBadgeId === 'none' ? '保存中...' : '不佩戴徽章'}</Text>
+              <Text style={styles.clearBadgeText}>{savingBadgeId === 'none' ? text('保存中...') : text('不佩戴徽章')}</Text>
             </Pressable>
 
             {error && <Text style={styles.badgeError}>{error}</Text>}
 
-            <BadgeCategory title="用户自定义徽章" caption="上传与后台审批后开放" muted />
-            <BadgeCategory title="组织徽章" caption="组织、旗帜和多人体系后续接入" muted />
-            <BadgeCategory title="特殊徽章" caption="粉丝会、奖励和活动徽章会逐步加入" muted />
+            <BadgeCategory title={text('用户自定义徽章')} caption={text('上传与后台审批后开放')} muted />
+            <BadgeCategory title={text('组织徽章')} caption={text('组织、旗帜和多人体系后续接入')} muted />
+            <BadgeCategory title={text('特殊徽章')} caption={text('粉丝会、奖励和活动徽章会逐步加入')} muted />
           </ScrollView>
         </View>
       </View>
@@ -1182,12 +1355,13 @@ function BadgeOption({
   styles: ReturnType<typeof createStyles>
   onPress: () => void
 }) {
+  const { text } = useI18n()
   return (
     <Pressable style={[styles.badgeOption, active && styles.badgeOptionActive]} onPress={onPress} disabled={saving}>
       <Image source={badge.image} style={styles.badgeOptionImage} resizeMode="contain" />
       <Text numberOfLines={2} style={styles.badgeOptionTitle}>{badge.title}</Text>
       <View style={[styles.badgeState, active && styles.badgeStateActive]}>
-        <Text style={[styles.badgeStateText, active && styles.badgeStateTextActive]}>{saving ? '保存中' : active ? '佩戴中' : '选择'}</Text>
+        <Text style={[styles.badgeStateText, active && styles.badgeStateTextActive]}>{saving ? text('保存中') : active ? text('佩戴中') : text('选择')}</Text>
       </View>
     </Pressable>
   )
@@ -1209,9 +1383,9 @@ function genderColor(gender?: string | null) {
   return 'rgba(255,255,255,0.78)'
 }
 
-function ageText(birthDate?: string | null) {
+function ageText(birthDate?: string | null, text: SourceTextFn = (source) => source) {
   const age = calculateAge(birthDate)
-  return age === null ? '年龄保密' : `${age} 岁`
+  return age === null ? text('年龄保密') : text('{age} 岁', { age })
 }
 
 function normalizeEmpty(value: unknown) {
@@ -1286,30 +1460,36 @@ function toggleItem(items: string[], item: string, enabled: boolean) {
   return items.filter((current) => current !== item)
 }
 
-function visibleFieldLabel(field: string) {
+function visibleFieldLabel(field: string, text: SourceTextFn = (source) => source) {
   const labels: Record<string, string> = {
     avatar: '头像可见',
     bio: '简介可见',
     region: '地区可见',
     badges: '徽章可见',
   }
-  return labels[field] ?? field
+  return labels[field] ? text(labels[field]) : field
 }
 
-function securitySummary(settings: LocalProfileSettings) {
-  if (settings.appLockEnabled) return '已开启保护'
-  if (settings.twoFactorMethod !== 'off') return '2FA 已设置'
-  return '未设置'
+function securitySummary(settings: LocalProfileSettings, text: SourceTextFn = (source) => source) {
+  if (settings.appLockEnabled) return text('已开启保护')
+  if (settings.twoFactorMethod !== 'off') return text('2FA 已设置')
+  return text('未设置')
 }
 
-function appearanceSummary(settings: LocalProfileSettings, user: AuthUser) {
-  return user.uiLanguage || settings.uiLanguage || '默认'
+function appearanceSummary(settings: LocalProfileSettings, user: AuthUser, text: SourceTextFn = (source) => source) {
+  return languageLabel(UI_LANGUAGE_OPTIONS, user.uiLanguage || settings.uiLanguage) || text('默认')
 }
 
-function privacySummary(settings: LocalProfileSettings, user: AuthUser) {
-  if (user.isPublic === false || settings.whoCanViewMe === 'private') return '较私密'
-  if (!settings.searchable) return '不可搜索'
-  return '常规'
+function languageLabel(options: ReadonlyArray<{ value: string; label: string }>, value?: string | null) {
+  const clean = String(value ?? '').trim()
+  if (!clean) return ''
+  return options.find((option) => option.value === clean)?.label ?? clean
+}
+
+function privacySummary(settings: LocalProfileSettings, user: AuthUser, text: SourceTextFn = (source) => source) {
+  if (user.isPublic === false || settings.whoCanViewMe === 'private') return text('较私密')
+  if (!settings.searchable) return text('不可搜索')
+  return text('常规')
 }
 
 function calculateAge(birthDate?: string | null) {
@@ -1527,6 +1707,30 @@ function createStyles(t: ReturnType<typeof useTheme>) {
     datePickerClearText: { color: '#ff3b30', fontSize: 16, fontWeight: '500' },
     datePickerDoneText: { color: '#007aff', fontSize: 16, fontWeight: '700', textAlign: 'right' },
     datePicker: { alignSelf: 'stretch', height: 216 },
+    languagePickerSheet: {
+      maxHeight: '74%',
+      borderTopLeftRadius: 18,
+      borderTopRightRadius: 18,
+      overflow: 'hidden',
+      backgroundColor: '#f2f2f7',
+    },
+    languageOptionList: { paddingBottom: 22 },
+    languageOption: {
+      minHeight: 58,
+      paddingLeft: 18,
+      paddingRight: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      borderBottomWidth: 0.5,
+      borderBottomColor: 'rgba(60,60,67,0.18)',
+      backgroundColor: '#fff',
+    },
+    languageOptionTextWrap: { flex: 1, minWidth: 0, paddingVertical: 9 },
+    languageOptionLabel: { color: '#111', fontSize: 16, fontWeight: '500' },
+    languageOptionDetail: { color: 'rgba(60,60,67,0.58)', fontSize: 12, fontWeight: '500', marginTop: 3 },
+    languageOptionCheck: { width: 24, color: 'transparent', fontSize: 20, fontWeight: '800', textAlign: 'right' },
+    languageOptionCheckActive: { color: '#007aff' },
     photoPickerScreen: { flex: 1, backgroundColor: '#000' },
     photoPickerHeader: { height: 96, paddingTop: 46, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.16)' },
     photoPickerHeaderButton: { width: 72, height: 38, justifyContent: 'center' },

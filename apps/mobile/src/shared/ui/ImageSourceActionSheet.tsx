@@ -1,4 +1,5 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useI18n } from '../../i18n'
 
 interface Props {
   visible: boolean
@@ -21,6 +22,12 @@ export function ImageSourceActionSheet({
   onLibrary,
   onClose,
 }: Props) {
+  const { text } = useI18n()
+  const displayTitle = title ? text(title) : text('添加图片')
+  const displayCameraLabel = cameraLabel ? text(cameraLabel) : text('拍照')
+  const displayLibraryLabel = libraryLabel ? text(libraryLabel) : text('从相册选择')
+  const displayCancelLabel = cancelLabel ? text(cancelLabel) : text('取消')
+
   function choose(action: () => void) {
     onClose()
     requestAnimationFrame(action)
@@ -32,16 +39,16 @@ export function ImageSourceActionSheet({
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={styles.sheetWrap}>
           <View style={styles.group}>
-            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.title}>{displayTitle}</Text>
             <Pressable style={styles.action} onPress={() => choose(onCamera)}>
-              <Text style={styles.actionText}>{cameraLabel}</Text>
+              <Text style={styles.actionText}>{displayCameraLabel}</Text>
             </Pressable>
             <Pressable style={styles.action} onPress={() => choose(onLibrary)}>
-              <Text style={styles.actionText}>{libraryLabel}</Text>
+              <Text style={styles.actionText}>{displayLibraryLabel}</Text>
             </Pressable>
           </View>
           <Pressable style={styles.cancel} onPress={onClose}>
-            <Text style={styles.cancelText}>{cancelLabel}</Text>
+            <Text style={styles.cancelText}>{displayCancelLabel}</Text>
           </Pressable>
         </View>
       </View>

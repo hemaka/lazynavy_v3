@@ -18,6 +18,7 @@ import type { ChatRoom } from '../api/client'
 import { getOrCreateLocationRoomApi, listChatRoomsApi, NEARBY_LOCATION_ROOMS } from '../api/client'
 import { formatChatTime, hueForId, lastMessagePreview, roomInitial, roomSubtitle, roomTitle, roomTypeBadge } from '../utils/present'
 import { useTheme } from '../../../theme'
+import { useI18n } from '../../../i18n'
 
 function hslColor(hue: number) {
   return `hsl(${hue}, 55%, 30%)`
@@ -33,6 +34,7 @@ export default function MessagesScreen({
   floating?: boolean
 } = {}) {
   const t = useTheme()
+  const { text } = useI18n()
   const { token, user, ready } = useAuth()
   const [authVisible, setAuthVisible] = useState(false)
   const [rooms, setRooms] = useState<ChatRoom[]>([])
@@ -92,7 +94,7 @@ export default function MessagesScreen({
     try {
       setRooms(await listChatRoomsApi(token))
     } catch (err: any) {
-      setError(err?.message ?? '聊天加载失败')
+      setError(err?.message ?? text('聊天加载失败'))
     } finally {
       if (mode === 'refresh') setRefreshing(false)
       else setLoading(false)
@@ -114,7 +116,7 @@ export default function MessagesScreen({
       if (onOpenRoom) onOpenRoom(room.id)
       else router.push(`/chat/${room.id}`)
     } catch (err: any) {
-      Alert.alert('进入房间失败', err?.message ?? '请稍后重试')
+      Alert.alert(text('进入房间失败'), err?.message ?? text('请稍后重试'))
     } finally {
       setOpeningId(null)
     }
@@ -130,7 +132,7 @@ export default function MessagesScreen({
       >
         <View style={styles.header}>
           <View style={styles.headerMain}>
-            <Text style={styles.title}>消息</Text>
+            <Text style={styles.title}>{text('消息')}</Text>
             <Text style={styles.subtitle}>{token ? `${rooms.length} ROOMS · ${totalUnread} NEW` : 'SIGN IN TO CHAT'}</Text>
           </View>
           <Pressable style={styles.closeButton} onPress={onClose ?? (() => router.replace('/'))}>
@@ -141,47 +143,47 @@ export default function MessagesScreen({
         {!ready || loading ? (
           <View style={styles.stateWrap}>
             <ActivityIndicator color={t.accent} />
-            <Text style={styles.stateText}>正在读取聊天房间...</Text>
+            <Text style={styles.stateText}>{text('正在读取聊天房间...')}</Text>
           </View>
         ) : !token ? (
           <View style={styles.stateWrap}>
-            <Text style={styles.stateTitle}>登录后开启聊天</Text>
-            <Text style={styles.stateText}>进入地域房间，和船友同步航行协作消息。</Text>
+            <Text style={styles.stateTitle}>{text('登录后开启聊天')}</Text>
+            <Text style={styles.stateText}>{text('进入地域房间，和船友同步航行协作消息。')}</Text>
             <Pressable style={styles.stateBtn} onPress={() => setAuthVisible(true)}>
-              <Text style={styles.stateBtnText}>登录 / 注册</Text>
+              <Text style={styles.stateBtnText}>{text('登录 / 注册')}</Text>
             </Pressable>
           </View>
         ) : (
           <>
-            <Text style={styles.sectionLabel}>ROOMS · 地域房间</Text>
+            <Text style={styles.sectionLabel}>ROOMS · {text('地域房间')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.nearbyList}>
               {NEARBY_LOCATION_ROOMS.map((item) => (
                 <Pressable key={item.sourceId} style={styles.nearbyCard} onPress={() => void openNearby(item)}>
                   <View style={styles.nearbyPill}><Text style={styles.nearbyPillText}>{item.geoRegion?.toUpperCase()}</Text></View>
                   <Text style={styles.nearbyTitle} numberOfLines={2}>{item.title}</Text>
-                  <Text style={styles.nearbyMeta}>{openingId === item.sourceId ? 'opening...' : '进入房间'}</Text>
+                  <Text style={styles.nearbyMeta}>{openingId === item.sourceId ? text('打开中...') : text('进入房间')}</Text>
                 </Pressable>
               ))}
             </ScrollView>
 
-            <Text style={styles.sectionLabel}>RECENT · 最近</Text>
+            <Text style={styles.sectionLabel}>RECENT · {text('最近')}</Text>
             {error ? (
               <View style={styles.stateWrap}>
-                <Text style={styles.stateTitle}>聊天加载失败</Text>
+                <Text style={styles.stateTitle}>{text('聊天加载失败')}</Text>
                 <Text style={styles.stateText}>{error}</Text>
                 <Pressable style={styles.stateBtn} onPress={() => void load('initial')}>
-                  <Text style={styles.stateBtnText}>重试</Text>
+                  <Text style={styles.stateBtnText}>{text('重试')}</Text>
                 </Pressable>
               </View>
             ) : rooms.length === 0 ? (
               <View style={styles.stateWrap}>
-                <Text style={styles.stateTitle}>还没有聊天</Text>
-                <Text style={styles.stateText}>从上方地域房间进入一个频道，开始第一条消息。</Text>
+                <Text style={styles.stateTitle}>{text('还没有聊天')}</Text>
+                <Text style={styles.stateText}>{text('从上方地域房间进入一个频道，开始第一条消息。')}</Text>
               </View>
             ) : (
               <View style={styles.roomCard}>
                 {rooms.map((room, index) => {
-                  const title = roomTitle(room, user?.id)
+                  const title = roomTitle(room, user?.id, text)
                   return (
                     <View key={room.id}>
                       <Pressable style={styles.row} onPress={() => onOpenRoom ? onOpenRoom(room.id) : router.push(`/chat/${room.id}`)}>
@@ -197,11 +199,11 @@ export default function MessagesScreen({
                         </View>
                         <View style={styles.rowBody}>
                           <View style={styles.rowTop}>
-                            <View style={styles.badge}><Text style={styles.badgeText}>{roomTypeBadge(room)}</Text></View>
+                            <View style={styles.badge}><Text style={styles.badgeText}>{roomTypeBadge(room, text)}</Text></View>
                             <Text numberOfLines={1} style={styles.rowName}>{title}</Text>
                             <Text style={styles.rowTime}>{formatChatTime(room.lastMessage?.createdAt ?? room.updatedAt)}</Text>
                           </View>
-                          <Text numberOfLines={1} style={styles.rowLast}>{roomSubtitle(room)} · {lastMessagePreview(room.lastMessage)}</Text>
+                          <Text numberOfLines={1} style={styles.rowLast}>{roomSubtitle(room, text)} · {lastMessagePreview(room.lastMessage, text)}</Text>
                         </View>
                       </Pressable>
                       {index < rooms.length - 1 && <View style={styles.divider} />}

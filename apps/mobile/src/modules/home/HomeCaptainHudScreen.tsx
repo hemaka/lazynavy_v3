@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { CaptainHudResponse } from '@lazynavy-v3/types'
 import { IconGlyph } from '../../shared/ui/IconGlyph'
 import { colors } from '../../theme/tokens'
+import { useI18n } from '../../i18n'
 import { findBadge } from '../identity/badges/catalog'
 import { useAuth } from '../identity/context'
 import { useChatOverlay } from '../messages/ChatOverlay'
@@ -26,6 +27,7 @@ const hudBackground = require('../../assets/hud_bg_2.png')
 const hudBackgroundWidth = height * (2250 / 1500)
 
 export function HomeCaptainHudScreen() {
+  const { text } = useI18n()
   const insets = useSafeAreaInsets()
   const [hud, setHud] = useState<CaptainHudResponse | null>(fallbackHud)
   const [loading, setLoading] = useState(false)
@@ -102,7 +104,7 @@ export function HomeCaptainHudScreen() {
               onPress={() => router.push('/profile' as never)}
               hitSlop={10}
               accessibilityRole="button"
-              accessibilityLabel="打开我的"
+              accessibilityLabel={text('打开我的')}
             >
               <View style={styles.avatar}>
                 {hud.user.avatarUrl ? (
@@ -123,7 +125,7 @@ export function HomeCaptainHudScreen() {
               onPress={() => router.push('/profile?panel=badges' as never)}
               hitSlop={10}
               accessibilityRole="button"
-              accessibilityLabel="打开我的徽章"
+              accessibilityLabel={text('打开我的徽章')}
             >
               {activeBadge ? (
                 <Image source={activeBadge.image} style={styles.playerBadgeImage} resizeMode="contain" />
@@ -220,6 +222,7 @@ function ChatBubbleIcon() {
 }
 
 function CrewSheet({ hud, bottomOffset, onClose }: { hud: CaptainHudResponse; bottomOffset: number; onClose: () => void }) {
+  const { text } = useI18n()
   const isCaptain = hud.currentVessel?.userRole === 'captain'
   const captainName = isCaptain ? (hud.user?.nickname ?? 'Captain') : 'Captain'
   const crewCount = hud.currentVessel?.crewCount ?? 1
@@ -238,7 +241,7 @@ function CrewSheet({ hud, bottomOffset, onClose }: { hud: CaptainHudResponse; bo
           <View style={styles.memberAvatar}><Text style={styles.memberAvatarText}>{captainName.slice(0, 1)}</Text></View>
           <View style={styles.memberMain}>
             <Text numberOfLines={1} style={styles.memberName}>{captainName}</Text>
-            <Text style={styles.memberRole}>{isCaptain ? 'Captain · 我自己' : 'Captain'}</Text>
+            <Text style={styles.memberRole}>{isCaptain ? `Captain · ${text('我自己')}` : 'Captain'}</Text>
           </View>
         </View>
         {!isCaptain && (

@@ -3,7 +3,7 @@
     "name": "LazyNavy V3",
     "slug": "lazynavy-v3",
     "scheme": "lazynavyv3",
-    "version": "1.0.1.6",
+    "version": "1.0.1.10",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
